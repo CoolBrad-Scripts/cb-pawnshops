@@ -735,18 +735,25 @@ function RemoveFromStock(item, amount, job)
 end
 
 function UpdateClosedShop(job)
+    print("UpdateClosedShop called for job: ", job)
+    
     if UsingOxInventory then
+        print("UsingOxInventory is enabled.")
+
         -- Query to get the items and prices from the database for the specified job
         local query = [[
             SELECT item, price, amount FROM business_requests WHERE business = ?
         ]]
+        print("Executing SQL query for job: ", job)
         local result = SQLQuery(query, {job})  -- Use the passed job to query
 
         -- Prepare the inventory dynamically based on the result from the database
         local inventory = {}
 
         if result and #result > 0 then
+            print("SQL query returned results: ", #result, " items found.")
             for i = 1, #result do
+                print(string.format("Adding item to inventory: %s, Price: %d, Amount: %d", result[i].item, result[i].price, result[i].amount))
                 table.insert(inventory, {
                     name = result[i].item,
                     price = result[i].price,
@@ -754,28 +761,40 @@ function UpdateClosedShop(job)
                     currency = 'money'
                 })
             end
+        else
+            print("No results found from the SQL query.")
         end
 
         -- Register the shop with the dynamic inventory
         for _, shop in pairs(Config.ClosedShops) do
             if shop.job == job then
-                local uniquename = shop.job.."_pawnshop"               
+                print("Found matching shop for job: ", job)
+                local uniquename = shop.job.."_pawnshop"
+                print("Unique shop name: ", uniquename)
+                exports.ox_inventory:RegisterStash(uniquename, shop.label, #shop.allowedItems, shop.weight)
+
                 -- Fetch all items in the stash
                 local stashItems = exports.ox_inventory:GetInventoryItems(uniquename)
-                        
+                print(json.encode(stashItems, {indent = true}))
+                print("Fetched stash items for: ", uniquename)
+
                 local stashItemNames = {}
                 local totalStashItems = 0
                 if stashItems then
                     for _, stashItem in pairs(stashItems) do
                         stashItemNames[stashItem.name] = stashItem.count -- Keep track of the item and its count
                         totalStashItems = totalStashItems + 1
+                        print(string.format("Stash item: %s, Count: %d", stashItem.name, stashItem.count))
                     end
+                else
+                    print("No stash items found for: ", uniquename)
                 end
 
-                if not stashItems or (totalStashItems ~= #shop.allowedItems) then
-                    exports.ox_inventory:RegisterStash(uniquename, shop.label, #shop.allowedItems, shop.weight)
-                end
+                print("Total stash items: ", totalStashItems, " Allowed items: ", #shop.allowedItems)
+
+                print("Deleting old requests for job: ", job)
                 DeleteOldRequests(job)
+
                 for stashItemName, stashItemCount in pairs(stashItemNames) do
                     local isAllowed = false
                     for _, allowedItem in ipairs(shop.allowedItems) do
@@ -786,26 +805,32 @@ function UpdateClosedShop(job)
                     end
                     if not isAllowed then
                         -- If the item is not allowed, remove it from the stash
+                        print(string.format("Unauthorized item found: %s, Removing %d from %s", stashItemName, stashItemCount, uniquename))
                         if exports.ox_inventory:RemoveItem(uniquename, stashItemName, stashItemCount) then
                             DiscordLog(string.format("Unauthorized item. Removed %.0fx %s from %s", stashItemCount, GetItemLabel(stashItemName), uniquename))
                         end
                     end
                 end
-        
+
                 -- Check if any allowed items are missing and add them
                 for _, item in ipairs(shop.allowedItems) do
                     if stashItemNames[item] == 0 or stashItemNames[item] == nil then
                         -- Item is not in the stash, add it
+                        print(string.format("Adding missing allowed item: %s to %s", item, uniquename))
                         exports.ox_inventory:AddItem(uniquename, item, 1)
                     end
                 end
-        
+
                 -- Register the pawnshop in the list
+                print("Registering pawnshop: ", uniquename)
                 pawnshops[#pawnshops + 1] = uniquename
             end
         end        
+    else
+        print("UsingOxInventory is disabled.")
     end
 end
+
 
 RegisterNetEvent('cb-pawnshops:server:DeletePed')
 AddEventHandler('cb-pawnshops:server:DeletePed', function(ped)

@@ -4,7 +4,7 @@ Config.InventoryImage = "ox_inventory/web/images/"  -- Source of inventory image
 Config.ClosedShops = {
     [1] = {
         job = "whitewidow",
-        coords = vec4(205.19, -230.81, 52.95, 180.81),
+        coords = vec4(200.72, -235.76, 53.0, 300.26),
         label = "Open Shop",
         weight = 999999,
         allowedItems = {
@@ -16,18 +16,6 @@ Config.ClosedShops = {
             "weed_skunk_baggy",
             "weed_whitewidow_baggy",
             "weed_gelato_baggy",
-        },
-        targetDistance = 1.5,
-    },
-    [2] = {
-        job = "mechanic",
-        coords = vec4(206.07, -233.56, 52.96, 129.8),
-        label = "Open Shop",
-        weight = 999999,
-        allowedItems = {
-            "iron",
-            "steel",
-            "aluminum",
         },
         targetDistance = 1.5,
     }
