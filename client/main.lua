@@ -11,6 +11,47 @@ lib.callback.register('cb-pawnshops:client:ConfirmSale', function(item, price)
     return alert
 end)
 
+function OpenPricesMenu(job)
+    print("here")
+    local menuOptions = {}
+    local buyRequests = lib.callback.await('cb-pawnshops:server:GetBuyRequests', false, job)
+    if not buyRequests then
+        table.insert(menuOptions, {
+            title = 'No Buy Requests',
+            description = 'You have not set any Buy Requests',
+            icon = 'fa-solid fa-shopping-cart',
+            disabled = true,
+        })
+    else
+        for _, request in pairs(buyRequests) do
+            -- Extract the relevant values for each request
+            local requestedItem = request.item or "Unknown Item"
+            local amount = request.amount or 0
+            local price = request.price or 0
+        
+            -- Create a title and description for each buy request
+            local title = string.format("%s", GetItemLabel(requestedItem))
+            local description = string.format("Price: $%d\nAmount to Buy: %.0f", price, amount)
+        
+            -- Insert the options dynamically into the menuOptions table
+            table.insert(menuOptions, {
+                title = title,
+                description = description,
+                icon = GetItemImage(requestedItem),
+                onSelect = function()
+                    exports.ox_inventory:openInventory('stash', job..'_pawnshop')
+                end
+            })
+        end
+    end
+    lib.registerContext({
+        id = 'PricesMenu',
+        title = "Active Buy Requests",
+        options = menuOptions
+    })
+    lib.showContext('PricesMenu')
+end
+
 function EditBuyRequestMenu(job, item)
     local menuOptions = {}
     local buyRequests = lib.callback.await('cb-pawnshops:server:GetBuyRequests', false, job)
@@ -127,7 +168,7 @@ function OpenShopMenu(job)
                     EditBuyRequestMenu(job, item)
                 end
             })
-        end        
+        end
     end
 
     for k, v in pairs(Config.ClosedShops) do
@@ -140,6 +181,7 @@ function OpenShopMenu(job)
         title = 'Create Buy Request',
         description = 'Create a Buy Request for a specific item',
         icon = 'fa-solid fa-money-bill-wave',
+        iconColor = "green",
         onSelect = function()
             local input = lib.inputDialog('Amount', {
                 {type = 'select', label = 'Item', description = 'Select the item you want to purchase from civillians', required = true, options = itemOptions },
@@ -148,20 +190,6 @@ function OpenShopMenu(job)
             })
             print(input[1], input[2], input[3])
             lib.callback.await('cb-pawnshops:server:AddBuyRequest', false, input[1], input[2], input[3], job)
-        end
-    })
-
-    table.insert(menuOptions, {
-        title = 'Delete Old Requests',
-        description = 'Delete any items that the Gods no longer allow your business to purchase',
-        icon = 'fa-solid fa-trash',
-        onSelect = function()
-            local deletedItems = lib.callback.await('cb-pawnshops:server:DeleteOldRequests', false, job)
-            if deletedItems then
-                Notify("Deleted Items", "Unecessary items have been deleted", "success")
-            else
-                Notify("No Items Found", "No uncessary items were found", "error")
-            end
         end
     })
 
@@ -209,6 +237,14 @@ local function spawnClosedShopPedForPlayer(job)
                 table.insert(ClosedShopPeds[job], closedShopPed)
 
                 exports.ox_target:addLocalEntity(closedShopPed, {
+                    {
+                        label = "View Prices",
+                        icon = "fa-solid fa-money-bill-wave",
+                        distance = shopData.targetDistance,
+                        onSelect = function()
+                            OpenPricesMenu(job)
+                        end,
+                    },
                     {
                         label = shopData.label,
                         icon = "fa-solid fa-shopping-cart",

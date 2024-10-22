@@ -1,8 +1,7 @@
 SpawnedShopPeds = {}
 local pawnshops = {}
 
-function GetStockItems(job)
-    print(job)
+function GetActiveRequests(job)
     if not job then return {} end -- Return empty table if job is not provided
     local query = [[
         SELECT item, price, amount FROM business_requests WHERE business = ?
@@ -17,7 +16,7 @@ function GetStockItems(job)
 end
 
 function GetRequestAmount(job, item)
-    local stockItems = GetStockItems(job) -- Get the stock items for the specified job
+    local stockItems = GetActiveRequests(job) -- Get the stock items for the specified job
     for _, v in ipairs(stockItems) do
         if v.item == item then
             return v.amount -- Return the amount of the item if it exists
@@ -190,7 +189,7 @@ function NewTransaction(payload)
                 for _, shop in pairs(Config.ClosedShops) do
                     if payload.toType == "stash" then
                         print("Condition: toType is 'stash', getting stock items for shop:", shop.job)
-                        local stockItems = GetStockItems(shop.job)
+                        local stockItems = GetActiveRequests(shop.job)
                         for _, v in ipairs(stockItems) do
                             print("Checking stock item:", v.item)
                             if v.item == item then
@@ -347,16 +346,8 @@ lib.callback.register('cb-pawnshops:server:hasRequiredItem', function(source, it
     end
 end)
 
-lib.callback.register('cb-pawnshops:server:DeleteOldRequests', function(source, job)
-    local src = source
-    if src == nil then return false end
-    local Player = GetPlayer(src)
-    if Player == nil then return end
-    local playerJob = Player.PlayerData.job.name
-    if job ~= playerJob then
-        return false
-    end
-
+function DeleteOldRequests(job)
+    local requests = GetActiveRequests(job)
     -- Get the pawn shop configuration for this job
     local pawnShopConfig = nil
     for _, shop in pairs(Config.ClosedShops) do
@@ -369,7 +360,7 @@ lib.callback.register('cb-pawnshops:server:DeleteOldRequests', function(source, 
     -- Ensure the pawn shop configuration exists for the job
     if not pawnShopConfig then
         print("No pawn shop configuration found for job:", job)
-        return false
+        return
     end
 
     local allowedItems = pawnShopConfig.allowedItems or {}
@@ -379,33 +370,16 @@ lib.callback.register('cb-pawnshops:server:DeleteOldRequests', function(source, 
         allowedItemsSet[itemName] = true
     end
 
-    local uniquename = job.."_pawnshop"
-    local stashItems = exports.ox_inventory:GetInventoryItems(uniquename)
-    local deletedItems = false
-    if stashItems then
-        for k, v in pairs(stashItems) do
-            -- Check if the item is NOT in the allowedItems list
-            if not allowedItemsSet[v.name] then
-                exports.ox_inventory:RemoveItem(uniquename, v.name, v.count)
-                local addAmount = v.count - 1
-                if addAmount ~= 0 then
-                    if AddItem(src, v.name, addAmount) then
-                        deletedItems = true
-                        UpdateClosedShop(job)
-                    else
-                        TriggerClientEvent('cb-pawnshops:client:Notify', src, "Inventory Error", "There was an issue deleting the request! Please try again!", "error")
-                        exports.ox_inventory:AddItem(uniquename, v.name, v.count)
-                    end
-                end
-            end
-        end
-        if deletedItems then
-            return true
-        else
-            return false
+    for _, request in pairs(requests) do
+        if not allowedItemsSet[request.item] then
+            local deleteQuery = [[
+                DELETE FROM business_requests WHERE business = ? AND item = ?
+            ]]
+            SQLQuery(deleteQuery, {job, request.item})
+            DiscordLog(string.format("Removed an unauthorized request for %s from %s resulting in $%.0f being lost by the business", request.item, job, request.price * request.amount))
         end
     end
-end)
+end
 
 lib.callback.register('cb-pawnshops:server:EditBuyRequestPrice', function(source, item, newPrice, job)
     local src = source
@@ -798,8 +772,7 @@ function UpdateClosedShop(job)
                         stashItemNames[stashItem.name] = stashItem.count -- Keep track of the item and its count
                     end
                 end
-        
-                -- Remove any items not in the allowedItems list
+                DeleteOldRequests(job)
                 for stashItemName, stashItemCount in pairs(stashItemNames) do
                     local isAllowed = false
                     for _, allowedItem in ipairs(shop.allowedItems) do
@@ -810,9 +783,9 @@ function UpdateClosedShop(job)
                     end
                     if not isAllowed then
                         -- If the item is not allowed, remove it from the stash
-                        -- TODO: Log this
-                        print("Removing unauthorized item from stash: "..stashItemName)
-                        exports.ox_inventory:RemoveItem(uniquename, stashItemName, stashItemCount)
+                        if exports.ox_inventory:RemoveItem(uniquename, stashItemName, stashItemCount) then
+                            DiscordLog(string.format("Unauthorized item. Removed %.0fx %s from %s", stashItemCount, GetItemLabel(stashItemName), uniquename))
+                        end
                     end
                 end
         
