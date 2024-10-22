@@ -184,7 +184,7 @@ function OpenShopMenu(job)
         iconColor = "green",
         onSelect = function()
             local input = lib.inputDialog('Amount', {
-                {type = 'select', label = 'Item', description = 'Select the item you want to purchase from civillians', required = true, options = itemOptions },
+                {type = 'select', label = 'Item', description = 'Select the item you want to purchase from civilians', required = true, options = itemOptions },
                 {type = 'number', label = 'Amount', description = 'Enter the number of items to buy', required = true, min = 1, max = 999},
                 {type = 'number', label = 'Price', description = 'Enter the price you are willing to pay!', required = true, min = 1, max = 999},
             })

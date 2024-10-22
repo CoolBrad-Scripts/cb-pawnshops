@@ -82,13 +82,15 @@ function NewTransaction(payload)
     for k, v in pairs(Config.ClosedShops) do
         uniquename = v.job.."_pawnshop"
         print("Checking ClosedShop:", uniquename)
-        if toInventory == uniquename then
+        if (toInventory == uniquename) or (fromInventory == uniquename) then
             match = true
             print("Match found for toInventory in ClosedShops:", uniquename)
+            break
         end
     end
 
     print("Match result:", match)
+    print(fromInventory, uniquename)
 
     if fromInventory == uniquename then
         print("Job is: " .. job)
@@ -188,7 +190,7 @@ function NewTransaction(payload)
                 return false
             else
                 for _, shop in pairs(Config.ClosedShops) do
-                    if shop.job == job then
+                    if shop.job.."_pawnshop" == toInventory then
                         if payload.toType == "stash" then
                             print("Condition: toType is 'stash', getting stock items for shop:", shop.job)
                             local stockItems = GetActiveRequests(shop.job)
@@ -272,7 +274,6 @@ RegisterNetEvent('cb-pawnshops:server:OnLoadSpawnShopPeds')
 AddEventHandler('cb-pawnshops:server:OnLoadSpawnShopPeds', function()
     for _, shop in pairs(Config.ClosedShops) do
         local onDuty = GetDutyCount(shop.job)
-        print(onDuty, shop.job)
         if onDuty <= 0 then
             TriggerClientEvent('cb-pawnshops:client:SpawnClosedShopPed', -1, shop.job)
             SpawnedShopPeds[shop.job] = true
@@ -299,7 +300,6 @@ AddEventHandler('onResourceStart', function(resourceName)
 
     -- Call any other necessary update functions after spawning the peds
     for _, shop in pairs(Config.ClosedShops) do
-        print("Updating shop: %s", shop.job)
         UpdateClosedShop(shop.job)
     end
 end)
@@ -362,10 +362,7 @@ function DeleteOldRequests(job)
     end
 
     -- Ensure the pawn shop configuration exists for the job
-    if not pawnShopConfig then
-        print("No pawn shop configuration found for job:", job)
-        return
-    end
+    if not pawnShopConfig then return end
 
     local allowedItems = pawnShopConfig.allowedItems or {}
     local allowedItemsSet = {}
@@ -549,9 +546,7 @@ lib.callback.register('cb-pawnshops:server:AddBuyRequest', function(source, item
     local result = SQLQuery(checkQuery, {job, item})
 
     if result and #result > 0 then
-        local existingAmount = tonumber(result[1].amount)
-        print(existingAmount)
-        
+        local existingAmount = tonumber(result[1].amount)        
         -- If the item exists and amount is not zero, return false
         if existingAmount ~= 0 then
             TriggerClientEvent('cb-pawnshops:client:Notify', src, "Item Out of Stock", "This item is out of stock!", "error")
@@ -772,14 +767,12 @@ function UpdateClosedShop(job)
                 local totalStashItems = 0
                 if stashItems then
                     for _, stashItem in pairs(stashItems) do
-                        print("Found Item in Stash: "..stashItem.name)
                         stashItemNames[stashItem.name] = stashItem.count -- Keep track of the item and its count
                         totalStashItems = totalStashItems + 1
                     end
                 end
 
                 if not stashItems or (totalStashItems ~= #shop.allowedItems) then
-                    print("Registering Stash: "..uniquename)
                     exports.ox_inventory:RegisterStash(uniquename, shop.label, #shop.allowedItems, shop.weight)
                 end
                 DeleteOldRequests(job)
@@ -801,14 +794,9 @@ function UpdateClosedShop(job)
         
                 -- Check if any allowed items are missing and add them
                 for _, item in ipairs(shop.allowedItems) do
-                    print("Checking Item: "..item)
-                    print(stashItemNames[item])
-                    print(stashItemNames[item] == 0)
-                    print(stashItemNames[item] == nil)
                     if stashItemNames[item] == 0 or stashItemNames[item] == nil then
                         -- Item is not in the stash, add it
                         exports.ox_inventory:AddItem(uniquename, item, 1)
-                        print("Added new item to stash: "..item)
                     end
                 end
         

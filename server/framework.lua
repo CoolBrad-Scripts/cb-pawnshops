@@ -161,7 +161,6 @@ function GetItemLabel(item)
 end
 
 function GetItemImage(item)
-    print(item)
     if GetResourceState('ox_inventory') == 'started' then
         return exports.ox_inventory:Items(item).client.image
     else
