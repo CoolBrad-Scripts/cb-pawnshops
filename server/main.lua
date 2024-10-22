@@ -183,7 +183,12 @@ function NewTransaction(payload)
                                     else
                                         local result = DecreaseRequestAmount(shop.job, item, payload.count)
                                         if result then
-                                            return true
+                                            if AddCash(payload.source, v.price * payload.count) then
+                                                return true
+                                            else
+                                                IncreaseRequestAmount(shop.job, item, payload.count)
+                                                return false
+                                            end
                                         else
                                             return false
                                         end
@@ -288,7 +293,7 @@ CreateThread(function()
     end
 end)
 
-lib.callback.register('cb-pawnshops:server:GetStockItems', function(source, job)
+lib.callback.register('cb-pawnshops:server:GetBuyRequests', function(source, job)
     local src = source
     if src == nil then return false end
     local Player = GetPlayer(src)
@@ -317,7 +322,204 @@ lib.callback.register('cb-pawnshops:server:hasRequiredItem', function(source, it
     end
 end)
 
-lib.callback.register('cb-pawnshops:server:AddRequest', function(source, item, amount, price)
+lib.callback.register('cb-pawnshops:server:DeleteOldRequests', function(source, job)
+    local src = source
+    if src == nil then return false end
+    local Player = GetPlayer(src)
+    if Player == nil then return end
+    local playerJob = Player.PlayerData.job.name
+    if job ~= playerJob then
+        return false
+    end
+
+    -- Get the pawn shop configuration for this job
+    local pawnShopConfig = nil
+    for _, shop in pairs(Config.ClosedShops) do
+        if shop.job == job then
+            pawnShopConfig = shop
+            break
+        end
+    end
+
+    -- Ensure the pawn shop configuration exists for the job
+    if not pawnShopConfig then
+        print("No pawn shop configuration found for job:", job)
+        return false
+    end
+
+    local allowedItems = pawnShopConfig.allowedItems or {}
+    local allowedItemsSet = {}
+    -- Convert allowed items list to a set for fast lookup
+    for _, itemName in pairs(allowedItems) do
+        allowedItemsSet[itemName] = true
+    end
+
+    local uniquename = job.."_pawnshop"
+    local stashItems = exports.ox_inventory:GetInventoryItems(uniquename)
+    local deletedItems = false
+    if stashItems then
+        for k, v in pairs(stashItems) do
+            -- Check if the item is NOT in the allowedItems list
+            if not allowedItemsSet[v.name] then
+                exports.ox_inventory:RemoveItem(uniquename, v.name, v.count)
+                local addAmount = v.count - 1
+                if addAmount ~= 0 then
+                    if AddItem(src, v.name, addAmount) then
+                        deletedItems = true
+                        UpdateClosedShop(job)
+                    else
+                        TriggerClientEvent('cb-pawnshops:client:Notify', src, "Inventory Error", "There was an issue deleting the request! Please try again!", "error")
+                        exports.ox_inventory:AddItem(uniquename, v.name, v.count)
+                    end
+                end
+            end
+        end
+        if deletedItems then
+            return true
+        else
+            return false
+        end
+    end
+end)
+
+lib.callback.register('cb-pawnshops:server:EditBuyRequestPrice', function(source, item, newPrice, job)
+    local src = source
+    if src == nil then return false end
+    local Player = GetPlayer(src)
+    if Player == nil then return false end
+    local playerJob = Player.PlayerData.job.name
+    if job ~= playerJob then
+        return false
+    end
+
+    -- Fetch the old price first
+    local fetchQuery = [[
+        SELECT price, amount FROM business_requests WHERE business = ? AND item = ?
+    ]]
+    local resultOld = SQLQuery(fetchQuery, {job, item})
+    
+    if resultOld and resultOld[1] then
+        local oldPrice = resultOld[1].price  -- Store the old price
+        if oldPrice > newPrice then
+            if AddCash(src, (oldPrice - newPrice) * resultOld[1].amount) then
+                local updateQuery = [[
+                    UPDATE business_requests SET price = ? WHERE business = ? AND item = ?
+                ]]
+                local resultUpdate = SQLQuery(updateQuery, {newPrice, job, item})
+
+                if resultUpdate then
+                    UpdateClosedShop(job)
+                    return true, oldPrice -- Return true and the old price
+                end
+            else
+                return false
+            end
+        elseif newPrice > oldPrice then
+            if RemoveCash(src, (newPrice - oldPrice) * resultOld[1].amount) then
+                local updateQuery = [[
+                    UPDATE business_requests SET price = ? WHERE business = ? AND item = ?
+                ]]
+                local resultUpdate = SQLQuery(updateQuery, {newPrice, job, item})
+
+                if resultUpdate then
+                    UpdateClosedShop(job)
+                    return true, oldPrice -- Return true and the old price
+                end
+            else
+                TriggerClientEvent('cb-pawnshops:client:Notify', src, "Insufficient Funds", "You don't have enough cash to complete the request!", "error")
+                return false
+            end
+        elseif newPrice == oldPrice then
+            TriggerClientEvent('cb-pawnshops:client:Notify', src, "Same Price", "You already have a Buy Request for this price!", "error")
+            return false
+        else
+            return false
+        end
+    end
+    return false
+end)
+
+lib.callback.register('cb-pawnshops:server:EditBuyRequestAmount', function(source, item, newAmount, job)
+    local src = source
+    if src == nil then return false end
+    local Player = GetPlayer(src)
+    if Player == nil then return false end
+    local playerJob = Player.PlayerData.job.name
+    if job ~= playerJob then
+        return false
+    end
+
+    -- Fetch the old amount first
+    local fetchQuery = [[
+        SELECT amount, price FROM business_requests WHERE business = ? AND item = ?
+    ]]
+    local resultOld = SQLQuery(fetchQuery, {job, item})
+    
+    if resultOld and resultOld[1] then
+        local oldAmount = resultOld[1].amount  -- Store the old amount
+        if oldAmount > newAmount then
+            if AddCash(src, resultOld[1].price * (oldAmount - newAmount)) then
+                local updateQuery = [[
+                    UPDATE business_requests SET amount = ? WHERE business = ? AND item = ?
+                ]]
+                local resultUpdate = SQLQuery(updateQuery, {newAmount, job, item})
+
+                if resultUpdate then
+                    UpdateClosedShop(job)
+                    return true, oldAmount -- Return true and the old amount
+                end
+            else
+                return false
+            end
+        elseif newAmount > oldAmount then
+            if RemoveCash(src, resultOld[1].price * (newAmount - oldAmount)) then
+                local updateQuery = [[
+                    UPDATE business_requests SET amount = ? WHERE business = ? AND item = ?
+                ]]
+                local resultUpdate = SQLQuery(updateQuery, {newAmount, job, item})
+
+                if resultUpdate then
+                    UpdateClosedShop(job)
+                    return true, oldAmount -- Return true and the old amount
+                end
+            else
+                TriggerClientEvent('cb-pawnshops:client:Notify', src, "Insufficient Funds", "You don't have enough cash to complete the request!", "error")
+                return false
+            end
+        elseif newAmount == oldAmount then
+            TriggerClientEvent('cb-pawnshops:client:Notify', src, "Same Amount", "You already have a Buy Request for this amount!", "error")
+            return false
+        else
+            return false
+        end
+    end
+    return false
+end)
+
+lib.callback.register('cb-pawnshops:server:DeleteBuyRequest', function(source, item, job)
+    local src = source
+    if src == nil then return false end
+    local Player = GetPlayer(src)
+    if Player == nil then return false end
+    local playerJob = Player.PlayerData.job.name
+    if job ~= playerJob then
+        return false
+    end
+
+    local query = [[
+        DELETE FROM business_requests WHERE business = ? AND item = ?
+    ]]
+    local result = SQLQuery(query, {job, item})
+
+    if result then
+        UpdateClosedShop(job)
+        return true
+    else
+        return false
+    end
+end)
+
+lib.callback.register('cb-pawnshops:server:AddBuyRequest', function(source, item, amount, price)
     local src = source
     if src == nil then return false end
     local Player = GetPlayer(src)

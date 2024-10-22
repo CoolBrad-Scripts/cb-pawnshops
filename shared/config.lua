@@ -7,7 +7,7 @@ Config.ClosedShops = {
         weight = 999999,
         allowedItems = {
             "weed_ak47_baggy",
-            "weed_amnesia_baggy",
+            --"weed_amnesia_baggy",
             --"weed_zkittlez_baggy",
             --"weed_ogkush_baggy",
             --"weed_purplehaze_baggy",

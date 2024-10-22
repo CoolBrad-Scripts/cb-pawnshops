@@ -11,125 +11,159 @@ lib.callback.register('cb-pawnshops:client:ConfirmSale', function(item, price)
     return alert
 end)
 
-function AddRequestMenu(job)
+function EditBuyRequestMenu(job, item)
     local menuOptions = {}
+    local buyRequests = lib.callback.await('cb-pawnshops:server:GetBuyRequests', false, job)
+    if not buyRequests then
+        table.insert(menuOptions, {
+            title = 'No Buy Requests',
+            description = 'You have not set any Buy Requests',
+            icon = 'fa-solid fa-shopping-cart',
+            disabled = true,
+            onSelect = function()
+                exports.ox_inventory:openInventory('stash', job..'_pawnshop')
+            end
+        })
+    else
+        for _, request in pairs(buyRequests) do
+            -- Extract the relevant values for each request
+            local requestedItem = request.item or "Unknown Item"
+            if requestedItem == item then
+                local amount = request.amount or 0
+                local price = request.price or 0
+            
+                -- Create a title and description for each buy request
+                local title = string.format("%s", GetItemLabel(requestedItem))
+                local description = string.format("Price: $%d\nAmount to Buy: %.0f", price, amount)
+            
+                -- Insert the options dynamically into the menuOptions table
+                table.insert(menuOptions, {
+                    title = title,
+                    description = description,
+                    icon = GetItemImage(requestedItem),
+                    disabled = true, -- Enable since we have valid buy requests
+                })
 
-    -- Find the allowed items based on the player's job
-    local allowedItems = {}
-    for _, shop in pairs(Config.ClosedShops) do
-        if shop.job == job then
-            allowedItems = shop.allowedItems
-            break
+                table.insert(menuOptions, {
+                    title = "Change Price",
+                    description = description,
+                    icon = "fa-solid fa-money-bill-wave",
+                    onSelect = function()
+                        local input = lib.inputDialog('Edit Buy Request', {
+                            {type = 'number', label = 'Price', description = 'Enter the price you are willing to pay!', required = true, min = 1, max = 99999},
+                        })
+                        lib.callback.await('cb-pawnshops:server:EditBuyRequestPrice', false, item, input[1], job)
+                    end
+                })
+
+                table.insert(menuOptions, {
+                    title = "Change Amount",
+                    description = description,
+                    icon = "fa-hashtag",
+                    onSelect = function()
+                        local input = lib.inputDialog('Edit Buy Request', {
+                            {type = 'number', label = 'Amount', description = 'Enter the amount you are willing to buy!', required = true, min = 1, max = 99999},
+                        })
+                        lib.callback.await('cb-pawnshops:server:EditBuyRequestAmount', false, item, input[1], job)
+                    end
+                })
+
+                table.insert(menuOptions, {
+                    title = "Delete Request",
+                    description = description,
+                    icon = "fa-solid fa-trash",
+                    onSelect = function()
+                        local deleted = lib.callback.await('cb-pawnshops:server:DeleteBuyRequest', false, item, job)
+                        if deleted then
+                            Notify("Deleted Request", "The buy request has been deleted", "success")
+                        else
+                            Notify("Failed to Delete", "The buy request could not be deleted. Try again!", "error")
+                        end
+                    end
+                })
+            end
         end
     end
-
-    for _, item in ipairs(allowedItems) do
-        table.insert(menuOptions, {
-            title = GetItemLabel(item),
-            description = "Request to buy " .. GetItemLabel(item) .. " from civillians",
-            icon = GetItemImage(item),
-            arrow = true,
-            onSelect = function()
-                local maxAmount = 1000
-                local amount = lib.inputDialog('Amount', {
-                    {type = 'number', label = 'Amount', description = 'Enter the number of items to buy', required = true, min = 1, max = maxAmount},
-                })
-                local price = lib.inputDialog('Price', {
-                    {type = 'number', label = 'Price', description = 'Enter the Price', required = true, min = 1, max = 99999},
-                })
-                local addedToStock = lib.callback.await('cb-pawnshops:server:AddRequest', false, item, amount[1], price[1])
-                if addedToStock then
-                    Notify("Request Added", "You have added " .. amount[1] .. " " .. GetItemLabel(item) .. " to the shop!", "success")
-                end
-            end
-        })
-    end
-
     lib.registerContext({
-        id = 'AddRequestMenu',
-        title = "Add Buy Order",
+        id = 'EditBuyRequestMenu',
+        title = "Edit Buy Request",
         options = menuOptions
     })
-    lib.showContext('AddRequestMenu')
-end
-
-function RemoveRequestMenu(job)
-    local menuOptions = {}
-    
-    -- Fetch stock items from the server
-    local stockItems = lib.callback.await('cb-pawnshops:server:GetStockItems', false, job)
-    
-    -- If no stock items, exit the function
-    if not stockItems or #stockItems == 0 then
-        Notify("Error", "No items found in stock!", "error")
-        return
-    end
-    
-    -- Iterate over the stock items and build menu options
-    for k, v in ipairs(stockItems) do
-        table.insert(menuOptions, {
-            title = GetItemLabel(v.item),  -- Use the item label
-            description = "Remove " .. GetItemLabel(v.item) .. " from the shop",
-            icon = GetItemImage(v.item),  -- Assume GetItemImage returns a valid icon
-            arrow = true,
-            disabled = v.amount <= 0,  -- Disable if no stock
-            onSelect = function()
-                local maxAmount = v.amount
-                
-                -- Display input dialog for removing stock
-                local amount = lib.inputDialog('Delete Buy Order', {
-                    {type = 'number', label = 'Amount', description = 'Enter the amount of items to remove', required = true, min = 1, max = maxAmount},
-                })
-                
-                if amount then
-                    -- Call the server-side removal function
-                    local removedFromStock = lib.callback.await('cb-pawnshops:server:RemoveStock', false, v.item, amount[1])
-                    
-                    -- Handle the result of the stock removal
-                    if removedFromStock then
-                        Notify("Removed", "You have removed " .. amount[1] .. " " .. GetItemLabel(v.item) .. " from the Buy Order!", "success")
-                    else
-                        Notify("Failed to Remove", "Failed to remove " .. amount[1] .. " " .. GetItemLabel(v.item) .. " from the Buy Order! Try Again!", "error")
-                    end
-                end
-            end
-        })
-    end
-    
-    -- Register and display the menu
-    lib.registerContext({
-        id = 'RemoveRequestMenu',
-        title = "Delete Buy Order",
-        options = menuOptions
-    })
-    
-    -- Show the menu
-    lib.showContext('RemoveRequestMenu')
+    lib.showContext('EditBuyRequestMenu')
 end
 
 function OpenShopMenu(job)
-    local menuOptions = {
-        {
-            title = "New Buy Order",
-            description = "Request to buy items from civillians",
-            icon = "fa-solid fa-boxes-stacked",
-            iconColor = "green",
-            arrow = true,
+    local menuOptions = {}
+    local itemOptions = {}
+    local buyRequests = lib.callback.await('cb-pawnshops:server:GetBuyRequests', false, job)
+    if not buyRequests then
+        table.insert(menuOptions, {
+            title = 'No Buy Requests',
+            description = 'You have not set any Buy Requests',
+            icon = 'fa-solid fa-shopping-cart',
+            disabled = true,
             onSelect = function()
-                AddRequestMenu(job)
+                exports.ox_inventory:openInventory('stash', job..'_pawnshop')
             end
-        },
-        {
-            title = "Delete Buy Order",
-            description = "Remove items from the shop",
-            icon = "fa-solid fa-boxes-stacked",
-            iconColor = "red",
-            arrow = true,
-            onSelect = function()
-                RemoveRequestMenu(job)
+        })
+    else
+        for _, request in pairs(buyRequests) do
+            -- Extract the relevant values for each request
+            local item = request.item or "Unknown Item"
+            local amount = request.amount or 0
+            local price = request.price or 0
+        
+            -- Create a title and description for each buy request
+            local title = string.format("%s", GetItemLabel(item))
+            local description = string.format("Price: $%d\nAmount to Buy: %.0f", price, amount)
+        
+            -- Insert the options dynamically into the menuOptions table
+            table.insert(menuOptions, {
+                title = title,
+                description = description,
+                icon = GetItemImage(item),
+                disabled = false, -- Enable since we have valid buy requests
+                onSelect = function()
+                    EditBuyRequestMenu(job, item)
+                end
+            })
+        end        
+    end
+
+    for k, v in pairs(Config.ClosedShops) do
+        for key, value in pairs(v.allowedItems) do
+            table.insert(itemOptions, {value = value, label = GetItemLabel(value)})
+        end
+    end    
+    
+    table.insert(menuOptions, {
+        title = 'Create Buy Request',
+        description = 'Create a Buy Request for a specific item',
+        icon = 'fa-solid fa-money-bill-wave',
+        onSelect = function()
+            local input = lib.inputDialog('Amount', {
+                {type = 'select', label = 'Item', description = 'Select the item you want to purchase from civillians', required = true, options = itemOptions },
+                {type = 'number', label = 'Amount', description = 'Enter the number of items to buy', required = true, min = 1, max = 999},
+                {type = 'number', label = 'Price', description = 'Enter the price you are willing to pay!', required = true, min = 1, max = 999},
+            })
+            print(input[1], input[2], input[3])
+            lib.callback.await('cb-pawnshops:server:AddBuyRequest', false, input[1], input[2], input[3], job)
+        end
+    })
+
+    table.insert(menuOptions, {
+        title = 'Delete Old Requests',
+        description = 'Delete any items that the Gods no longer allow your business to purchase',
+        icon = 'fa-solid fa-trash',
+        onSelect = function()
+            local deletedItems = lib.callback.await('cb-pawnshops:server:DeleteOldRequests', false, job)
+            if deletedItems then
+                Notify("Deleted Items", "Unecessary items have been deleted", "success")
+            else
+                Notify("No Items Found", "No uncessary items were found", "error")
             end
-        }
-    }
+        end
+    })
 
     lib.registerContext({
         id = 'OpenShopMenu',
