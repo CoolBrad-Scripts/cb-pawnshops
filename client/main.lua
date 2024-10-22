@@ -7,12 +7,10 @@ lib.callback.register('cb-pawnshops:client:ConfirmSale', function(item, price)
         centered = true,
         cancel = true
     })
-    print(alert)
     return alert
 end)
 
 function OpenPricesMenu(job)
-    print("here")
     local menuOptions = {}
     local buyRequests = lib.callback.await('cb-pawnshops:server:GetBuyRequests', false, job)
     if not buyRequests then
@@ -172,8 +170,10 @@ function OpenShopMenu(job)
     end
 
     for k, v in pairs(Config.ClosedShops) do
-        for key, value in pairs(v.allowedItems) do
-            table.insert(itemOptions, {value = value, label = GetItemLabel(value)})
+        if v.job == job then
+            for key, value in pairs(v.allowedItems) do
+                table.insert(itemOptions, {value = value, label = GetItemLabel(value)})
+            end
         end
     end    
     
@@ -188,7 +188,6 @@ function OpenShopMenu(job)
                 {type = 'number', label = 'Amount', description = 'Enter the number of items to buy', required = true, min = 1, max = 999},
                 {type = 'number', label = 'Price', description = 'Enter the price you are willing to pay!', required = true, min = 1, max = 999},
             })
-            print(input[1], input[2], input[3])
             lib.callback.await('cb-pawnshops:server:AddBuyRequest', false, input[1], input[2], input[3], job)
         end
     })

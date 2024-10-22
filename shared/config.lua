@@ -1,4 +1,6 @@
 Config = {}
+Config.Debug = true
+Config.InventoryImage = "ox_inventory/web/images/"  -- Source of inventory images (QB INVENTORY: "qb-inventory/html/images/")
 Config.ClosedShops = {
     [1] = {
         job = "whitewidow",
@@ -7,15 +9,15 @@ Config.ClosedShops = {
         weight = 999999,
         allowedItems = {
             "weed_ak47_baggy",
-            "weed_amnesia_baggy",
-            "weed_zkittlez_baggy",
-            "weed_ogkush_baggy",
-            "weed_purplehaze_baggy",
-            "weed_skunk_baggy",
-            "weed_whitewidow_baggy",
-            "weed_gelato_baggy",
-            "empty_weed_bag",
-            "bong",
+            --"weed_amnesia_baggy",
+            --"weed_zkittlez_baggy",
+            --"weed_ogkush_baggy",
+            --"weed_purplehaze_baggy",
+            --"weed_skunk_baggy",
+            --"weed_whitewidow_baggy",
+            --"weed_gelato_baggy",
+            --"empty_weed_bag",
+            --"bong",
             --"rolling_paper",
             --"weed_ak47_joint",
             --"weed_amnesia_joint",
@@ -25,6 +27,16 @@ Config.ClosedShops = {
             --"weed_skunk_joint",
             --"weed_whitewidow_joint",
             --"weed_gelato_joint",
+        },
+        targetDistance = 1.5,
+    },
+    [2] = {
+        job = "police",
+        coords = vec4(206.07, -233.56, 52.96, 129.8),
+        label = "Open Shop",
+        weight = 999999,
+        allowedItems = {
+            "glass",
         },
         targetDistance = 1.5,
     }

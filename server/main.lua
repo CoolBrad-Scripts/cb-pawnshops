@@ -72,6 +72,9 @@ function NewTransaction(payload)
     local fromInventory = payload.fromInventory
     local match = false
     local uniquename = nil
+    local Player = GetPlayer(payload.source)
+    if Player == nil then return false end
+    local job = Player.PlayerData.job.name
     
     print("toInventory:", toInventory)
     print("fromInventory:", fromInventory)
@@ -88,11 +91,9 @@ function NewTransaction(payload)
     print("Match result:", match)
 
     if fromInventory == uniquename then
-        local Player = GetPlayer(payload.source)
-        if Player == nil then return false end
-        local job = Player.PlayerData.job.name
         print("Job is: " .. job)
         if payload.action == 'swap' or payload.action == 'give' then
+            print("Condition: swap or give action, triggering client event and returning false")
             TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Allowed", "You are unable to perform this action right now!", "error")
             print("-----------------------------------------------------------")
             return false
@@ -187,47 +188,49 @@ function NewTransaction(payload)
                 return false
             else
                 for _, shop in pairs(Config.ClosedShops) do
-                    if payload.toType == "stash" then
-                        print("Condition: toType is 'stash', getting stock items for shop:", shop.job)
-                        local stockItems = GetActiveRequests(shop.job)
-                        for _, v in ipairs(stockItems) do
-                            print("Checking stock item:", v.item)
-                            if v.item == item then
-                                print("Stock item matches, returning true")
-                                print("-----------------------------------------------------------")
-                                local confirmSale = lib.callback.await('cb-pawnshops:client:ConfirmSale', payload.source, item, v.price)
-                                if confirmSale == 'confirm' then
-                                    local requestedAmount = GetRequestAmount(shop.job, item)
-                                    if requestedAmount == 0 then
-                                        TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Buying", "We don't need any more of this right now. Try again later!", "error")
-                                        return false
-                                    elseif payload.count > requestedAmount then
-                                        TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Too Much", string.format("We only need %.0f more %s!", requestedAmount, GetItemLabel(item)), "error")
-                                        return false
-                                    else
-                                        local result = DecreaseRequestAmount(shop.job, item, payload.count)
-                                        if result then
-                                            if AddCash(payload.source, v.price * payload.count) then
-                                                return true
+                    if shop.job == job then
+                        if payload.toType == "stash" then
+                            print("Condition: toType is 'stash', getting stock items for shop:", shop.job)
+                            local stockItems = GetActiveRequests(shop.job)
+                            for _, v in ipairs(stockItems) do
+                                print("Checking stock item:", v.item)
+                                if v.item == item then
+                                    print("Stock item matches, returning true")
+                                    print("-----------------------------------------------------------")
+                                    local confirmSale = lib.callback.await('cb-pawnshops:client:ConfirmSale', payload.source, item, v.price)
+                                    if confirmSale == 'confirm' then
+                                        local requestedAmount = GetRequestAmount(shop.job, item)
+                                        if requestedAmount == 0 then
+                                            TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Buying", "We don't need any more of this right now. Try again later!", "error")
+                                            return false
+                                        elseif payload.count > requestedAmount then
+                                            TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Too Much", string.format("We only need %.0f more %s!", requestedAmount, GetItemLabel(item)), "error")
+                                            return false
+                                        else
+                                            local result = DecreaseRequestAmount(shop.job, item, payload.count)
+                                            if result then
+                                                if AddCash(payload.source, v.price * payload.count) then
+                                                    return true
+                                                else
+                                                    IncreaseRequestAmount(shop.job, item, payload.count)
+                                                    return false
+                                                end
                                             else
-                                                IncreaseRequestAmount(shop.job, item, payload.count)
                                                 return false
                                             end
-                                        else
-                                            return false
                                         end
+                                    elseif confirmSale == 'cancel' then
+                                        return false
+                                    else
+                                        return false
                                     end
-                                elseif confirmSale == 'cancel' then
-                                    return false
-                                else
-                                    return false
                                 end
                             end
+                            print("Stock item does not match, triggering client event and returning false")
+                            TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Buying", "We don't need any more of this right now. Try again later!", "error")
+                            print("-----------------------------------------------------------")
+                            return false
                         end
-                        print("Stock item does not match, triggering client event and returning false")
-                        TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Buying", "We don't need any more of this right now. Try again later!", "error")
-                        print("-----------------------------------------------------------")
-                        return false
                     end
                 end
             end
@@ -296,6 +299,7 @@ AddEventHandler('onResourceStart', function(resourceName)
 
     -- Call any other necessary update functions after spawning the peds
     for _, shop in pairs(Config.ClosedShops) do
+        print("Updating shop: %s", shop.job)
         UpdateClosedShop(shop.job)
     end
 end)
@@ -763,14 +767,20 @@ function UpdateClosedShop(job)
                 local uniquename = shop.job.."_pawnshop"               
                 -- Fetch all items in the stash
                 local stashItems = exports.ox_inventory:GetInventoryItems(uniquename)
-                exports.ox_inventory:RegisterStash(uniquename, shop.label, #shop.allowedItems, shop.weight)
-        
+                        
                 local stashItemNames = {}
+                local totalStashItems = 0
                 if stashItems then
                     for _, stashItem in pairs(stashItems) do
                         print("Found Item in Stash: "..stashItem.name)
                         stashItemNames[stashItem.name] = stashItem.count -- Keep track of the item and its count
+                        totalStashItems = totalStashItems + 1
                     end
+                end
+
+                if not stashItems or (totalStashItems ~= #shop.allowedItems) then
+                    print("Registering Stash: "..uniquename)
+                    exports.ox_inventory:RegisterStash(uniquename, shop.label, #shop.allowedItems, shop.weight)
                 end
                 DeleteOldRequests(job)
                 for stashItemName, stashItemCount in pairs(stashItemNames) do
@@ -791,7 +801,11 @@ function UpdateClosedShop(job)
         
                 -- Check if any allowed items are missing and add them
                 for _, item in ipairs(shop.allowedItems) do
-                    if stashItemNames[item] == nil then
+                    print("Checking Item: "..item)
+                    print(stashItemNames[item])
+                    print(stashItemNames[item] == 0)
+                    print(stashItemNames[item] == nil)
+                    if stashItemNames[item] == 0 or stashItemNames[item] == nil then
                         -- Item is not in the stash, add it
                         exports.ox_inventory:AddItem(uniquename, item, 1)
                         print("Added new item to stash: "..item)

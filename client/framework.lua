@@ -62,8 +62,12 @@ function GetItemLabel(item)
 end
 
 function GetItemImage(item)
-    if GetResourceState('ox_inventory') == 'started' then
-        return exports.ox_inventory:Items(item).client.image
+    if GetResourceState('ox_inventory') == 'started' then           
+        if exports.ox_inventory:Items(item).client ~= nil then
+            return exports.ox_inventory:Items(item).client.image
+        else
+            return "nui://" .. Config.InventoryImage .. item .. ".png"
+        end
     else
         return "nui://" .. Config.InventoryImage .. QBCore.Shared.Items[item].image
     end
