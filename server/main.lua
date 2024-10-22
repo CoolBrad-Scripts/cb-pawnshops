@@ -26,15 +26,30 @@ function GetRequestAmount(job, item)
 end
 
 function DecreaseRequestAmount(job, item, amount)
-    local query = [[
+    -- First, decrease the amount
+    local updateQuery = [[
         UPDATE business_requests SET amount = amount - ? WHERE business = ? AND item = ?
     ]]
-    local result = SQLQuery(query, {amount, job, item}) -- Execute the SQL query with the job, item, and amount as parameters
+    local resultUpdate = SQLQuery(updateQuery, {amount, job, item}) -- Execute the SQL query with the job, item, and amount as parameters
 
-    if result then
-        return true -- Return true if the query was successful
+    if resultUpdate then
+        -- Check if the amount has reached 0 or less
+        local checkQuery = [[
+            SELECT amount FROM business_requests WHERE business = ? AND item = ?
+        ]]
+        local resultCheck = SQLQuery(checkQuery, {job, item})
+
+        if resultCheck and resultCheck[1] and resultCheck[1].amount <= 0 then
+            -- Delete the request if the amount is 0 or less
+            local deleteQuery = [[
+                DELETE FROM business_requests WHERE business = ? AND item = ?
+            ]]
+            SQLQuery(deleteQuery, {job, item}) -- Execute the deletion query
+        end
+
+        return true -- Return true if the update and check were successful
     else
-        return false -- Return false if the query failed
+        return false -- Return false if the update query failed
     end
 end
 
@@ -93,9 +108,16 @@ function NewTransaction(payload)
                 print("-----------------------------------------------------------")
                 print(payload.count)
                 print(payload.fromSlot.count)
-                if payload.count == payload.fromSlot.count or payload.fromSlot.count == 0 then
-                    TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Too Much", "You must leave at least one in the stash at all times!", "warning")
-                    return false
+                if payload.action == 'move' then
+                    if (payload.count == payload.fromSlot.count) then
+                        TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Too Much", "You must leave at least one in the stash at all times!", "warning")
+                        return false
+                    end
+                elseif payload.action == 'stack' then
+                    if payload.fromSlot.count == 0 then
+                        TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Too Much", "You must leave at least one in the stash at all times!", "warning")
+                        return false
+                    end
                 end
                 return true
             end
@@ -177,7 +199,10 @@ function NewTransaction(payload)
                                 local confirmSale = lib.callback.await('cb-pawnshops:client:ConfirmSale', payload.source, item, v.price)
                                 if confirmSale == 'confirm' then
                                     local requestedAmount = GetRequestAmount(shop.job, item)
-                                    if payload.count > requestedAmount then
+                                    if requestedAmount == 0 then
+                                        TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Buying", "We don't need any more of this right now. Try again later!", "error")
+                                        return false
+                                    elseif payload.count > requestedAmount then
                                         TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Too Much", string.format("We only need %.0f more %s!", requestedAmount, GetItemLabel(item)), "error")
                                         return false
                                     else
@@ -764,30 +789,46 @@ function UpdateClosedShop(job)
                 local uniquename = shop.job.."_pawnshop"               
                 -- Fetch all items in the stash
                 local stashItems = exports.ox_inventory:GetInventoryItems(uniquename)
-                if not stashItems then
-                    exports.ox_inventory:RegisterStash(uniquename, shop.label, #shop.allowedItems, shop.weight)
-                end
-
+                exports.ox_inventory:RegisterStash(uniquename, shop.label, #shop.allowedItems, shop.weight)
+        
                 local stashItemNames = {}
                 if stashItems then
                     for _, stashItem in pairs(stashItems) do
-                        stashItemNames[stashItem.name] = true -- Create a set-like table for fast lookup
+                        print("Found Item in Stash: "..stashItem.name)
+                        stashItemNames[stashItem.name] = stashItem.count -- Keep track of the item and its count
                     end
                 end
-
+        
+                -- Remove any items not in the allowedItems list
+                for stashItemName, stashItemCount in pairs(stashItemNames) do
+                    local isAllowed = false
+                    for _, allowedItem in ipairs(shop.allowedItems) do
+                        if stashItemName == allowedItem then
+                            isAllowed = true
+                            break
+                        end
+                    end
+                    if not isAllowed then
+                        -- If the item is not allowed, remove it from the stash
+                        -- TODO: Log this
+                        print("Removing unauthorized item from stash: "..stashItemName)
+                        exports.ox_inventory:RemoveItem(uniquename, stashItemName, stashItemCount)
+                    end
+                end
+        
                 -- Check if any allowed items are missing and add them
                 for _, item in ipairs(shop.allowedItems) do
                     if stashItemNames[item] == nil then
                         -- Item is not in the stash, add it
                         exports.ox_inventory:AddItem(uniquename, item, 1)
-                        print("Added new item to stash: ", item)
+                        print("Added new item to stash: "..item)
                     end
                 end
-
+        
                 -- Register the pawnshop in the list
                 pawnshops[#pawnshops + 1] = uniquename
             end
-        end
+        end        
     end
 end
 

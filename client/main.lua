@@ -219,7 +219,7 @@ local function spawnClosedShopPedForPlayer(job)
                     },
                     {
                         label = "Manage Shop",
-                        icon = "fa-solid fa-shopping-cart",
+                        icon = "fa-solid fa-briefcase",
                         distance = shopData.targetDistance,
                         onSelect = function()
                             OpenShopMenu(job)

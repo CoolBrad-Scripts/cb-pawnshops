@@ -152,19 +152,6 @@ function AddItem(source, item, amount)
     end
 end
 
-RegisterNetEvent("cb-pawnshops:server:RegisterStash")
-AddEventHandler("cb-pawnshops:server:RegisterStash", function(stashName)
-    local src = source
-    local Player = GetPlayer(src)
-    if Player == nil then return end
-    if UsingOxInventory then
-        exports.ox_inventory:RegisterStash(stashName, stashName, 200, 2000000, nil, nil)
-        exports.ox_inventory:forceOpenInventory(src, 'stash', stashName)
-    else
-        -- TODO: QB-Inventory Stuff
-    end
-end)
-
 function GetItemLabel(item)
     if GetResourceState('ox_inventory') == 'started' then
         return exports.ox_inventory:Items(item).label
