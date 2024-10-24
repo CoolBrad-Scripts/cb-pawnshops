@@ -4,6 +4,7 @@ CreateThread(function()
     if GetResourceState('qbx_core') == 'started' then
         Framework = "qbox"
     elseif GetResourceState('qb-core') == 'started' then
+        QBCore = exports['qb-core']:GetCoreObject()
         Framework = "qb-core"
     end
     if GetResourceState('ox_inventory') == 'started' then
