@@ -229,6 +229,8 @@ local function spawnClosedShopPedForPlayer(job)
                 FreezeEntityPosition(closedShopPed, true)
                 SetEntityInvincible(closedShopPed, true)
                 Wait(100)
+                SetBlockingOfNonTemporaryEvents(closedShopPed, true)
+                SetPedCanPlayAmbientAnims(closedShopPed, true)
                 TaskStartScenarioInPlace(closedShopPed, "WORLD_HUMAN_CLIPBOARD", 0, true)
                 if not ClosedShopPeds[job] then
                     ClosedShopPeds[job] = {}
