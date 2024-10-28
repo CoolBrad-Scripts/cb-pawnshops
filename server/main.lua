@@ -66,8 +66,6 @@ function IncreaseRequestAmount(job, item, amount)
 end
 
 function NewTransaction(payload)
-    print("NewTransaction called with payload:", payload)
-    
     local toInventory = payload.toInventory
     local fromInventory = payload.fromInventory
     local match = false
@@ -75,41 +73,25 @@ function NewTransaction(payload)
     local Player = GetPlayer(payload.source)
     if Player == nil then return false end
     local job = Player.PlayerData.job.name
-    
-    print("toInventory:", toInventory)
-    print("fromInventory:", fromInventory)
-
-    for k, v in pairs(Config.ClosedShops) do
+    local fullName = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
+    local cid = Player.PlayerData.citizenid
+    for k, v in pairs(Config.BusinessPawnShops) do
         uniquename = v.job.."_pawnshop"
-        print("Checking ClosedShop:", uniquename)
         if (toInventory == uniquename) or (fromInventory == uniquename) then
             match = true
-            print("Match found for toInventory in ClosedShops:", uniquename)
             break
         end
     end
 
-    print("Match result:", match)
-    print(fromInventory, uniquename)
-
     if fromInventory == uniquename then
-        print("Job is: " .. job)
         if payload.action == 'swap' or payload.action == 'give' then
-            print("Condition: swap or give action, triggering client event and returning false")
             TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Allowed", "You are unable to perform this action right now!", "error")
-            print("-----------------------------------------------------------")
             return false
         elseif payload.action == 'move' or payload.action == 'stack' then
             if job.."_pawnshop" ~= uniquename then
-                print("Condition: Job doesn't match, triggering client event and returning false")
                 TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Stealing?", "Are you trying to steal from me?", "error")
-                print("-----------------------------------------------------------")
                 return false
             else
-                print("Condition: fromInventory is uniquename and job matches, returning true")
-                print("-----------------------------------------------------------")
-                print(payload.count)
-                print(payload.fromSlot.count)
                 if payload.action == 'move' then
                     if (payload.count == payload.fromSlot.count) then
                         TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Too Much", "You must leave at least one in the stash at all times!", "warning")
@@ -121,84 +103,59 @@ function NewTransaction(payload)
                         return false
                     end
                 end
+                DiscordLog(string.format("%s (%s) has removed `%.0fx %s` from the `%s` Pawn Shop", fullName, cid, payload.count, payload.fromSlot.name, job))
                 return true
             end
         end
     end
 
     if not match then
-        print("Condition: Not a match, returning true")
-        print("-----------------------------------------------------------")
         return true
     else
-        print("Match found or fromInventory is uniquename, continuing")
-
         local item = nil
         for key, value in pairs(payload.fromSlot) do
             if key == "name" then
                 item = value
-                print("Item found in fromSlot:", item)
             end
         end
 
         if payload.fromType == 'player' and payload.toType == 'player' then
-            print("Condition: fromType and toType are both 'player', triggering client event and returning false")
             TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Allowed", "You are unable to perform this action right now!", "error")
-            print("-----------------------------------------------------------")
             return false
         end
 
         if payload.fromType == 'stash' then
-            print("Condition: fromType is 'stash', triggering client event and returning false")
             TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Stealing?", "Are you trying to steal from me?", "error")
-            print("-----------------------------------------------------------")
             return false
         end
 
         if payload.action == 'swap' then
-            print("Action is 'swap'")
             if payload.toType == "player" then
-                print("Condition: toType is 'player', triggering client event and returning false")
                 TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Stealing?", "Are you trying to steal from me?", "error")
-                print("-----------------------------------------------------------")
                 return false
             else
-                print("Condition: Not allowed swap action, triggering client event and returning false")
                 TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Allowed", "You are unable to perform this action right now!", "error")
-                print("-----------------------------------------------------------")
                 return false
             end
         elseif payload.action == 'move' then
-            print("Action is 'move'")
             if payload.toType == "player" then
-                print("Condition: toType is 'player', triggering client event and returning false")
                 TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Allowed", "You are unable to perform this action right now!", "error")
-                print("-----------------------------------------------------------")
                 return false
             elseif payload.toInventory == uniquename then
-                print("Condition: toType is uniquename, triggering client event and returning false")
                 TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Allowed", "You are unable to perform this action right now!", "error")
-                print("-----------------------------------------------------------")
                 return false
             end
         elseif payload.action == 'stack' then
-            print("Action is 'stack'")
             if payload.toType == "player" then
-                print("Condition: toType is 'player', triggering client event and returning false")
                 TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Allowed", "You are unable to perform this action right now!", "error")
-                print("-----------------------------------------------------------")
                 return false
             else
-                for _, shop in pairs(Config.ClosedShops) do
+                for _, shop in pairs(Config.BusinessPawnShops) do
                     if shop.job.."_pawnshop" == toInventory then
                         if payload.toType == "stash" then
-                            print("Condition: toType is 'stash', getting stock items for shop:", shop.job)
                             local stockItems = GetActiveRequests(shop.job)
                             for _, v in ipairs(stockItems) do
-                                print("Checking stock item:", v.item)
                                 if v.item == item then
-                                    print("Stock item matches, returning true")
-                                    print("-----------------------------------------------------------")
                                     local confirmSale = lib.callback.await('cb-pawnshops:client:ConfirmSale', payload.source, item, v.price)
                                     if confirmSale == 'confirm' then
                                         local requestedAmount = GetRequestAmount(shop.job, item)
@@ -212,6 +169,7 @@ function NewTransaction(payload)
                                             local result = DecreaseRequestAmount(shop.job, item, payload.count)
                                             if result then
                                                 if AddCash(payload.source, v.price * payload.count) then
+                                                    DiscordLog(string.format("%s (%s) has sold `%.0fx %s` to the `%s` Pawn Shop", fullName, cid, payload.count, payload.fromSlot.name, job))
                                                     return true
                                                 else
                                                     IncreaseRequestAmount(shop.job, item, payload.count)
@@ -228,20 +186,15 @@ function NewTransaction(payload)
                                     end
                                 end
                             end
-                            print("Stock item does not match, triggering client event and returning false")
                             TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Buying", "We don't need any more of this right now. Try again later!", "error")
-                            print("-----------------------------------------------------------")
                             return false
                         end
                     end
                 end
             end
         elseif payload.action == 'give' then
-            print("Action is 'give'")
             if payload.toType == "player" then
-                print("Condition: toType is 'player', triggering client event and returning false")
                 TriggerClientEvent('cb-pawnshops:client:Notify', payload.source, "Not Allowed", "You are unable to perform this action right now!", "error")
-                print("-----------------------------------------------------------")
                 return false
             end
         end
@@ -253,16 +206,16 @@ AddEventHandler('QBCore:Server:SetDuty', function(source, onDuty)
     local Player = GetPlayer(src)
     local job = Player.PlayerData.job.name
     -- Loop through all closed shops in the config
-    for _, shop in pairs(Config.ClosedShops) do
+    for _, shop in pairs(Config.BusinessPawnShops) do
         if job == shop.job then
             if GetDutyCount(job) == 0 then
                 -- Spawn the shop ped if no one is on duty
-                TriggerClientEvent('cb-pawnshops:client:SpawnClosedShopPed', -1, job)
+                TriggerClientEvent('cb-pawnshops:client:spawnBusinessPawnShopPed', -1, job)
                 SpawnedShopPeds[job] = true
             else
                 -- Delete the shop ped if someone is on duty
                 if (SpawnedShopPeds[job] ~= nil) then
-                    TriggerClientEvent('cb-pawnshops:client:DeleteClosedShopPed', -1, job)
+                    TriggerClientEvent('cb-pawnshops:client:DeleteBusinessPawnShopPed', -1, job)
                     SpawnedShopPeds[job] = false
                 end
             end
@@ -272,12 +225,12 @@ end)
 
 RegisterNetEvent('cb-pawnshops:server:OnLoadSpawnShopPeds')
 AddEventHandler('cb-pawnshops:server:OnLoadSpawnShopPeds', function()
-    for _, shop in pairs(Config.ClosedShops) do
+    for _, shop in pairs(Config.BusinessPawnShops) do
         local onDuty = GetDutyCount(shop.job)
         if onDuty <= 0 then
-            TriggerClientEvent('cb-pawnshops:client:SpawnClosedShopPed', -1, shop.job)
+            TriggerClientEvent('cb-pawnshops:client:spawnBusinessPawnShopPed', -1, shop.job)
             SpawnedShopPeds[shop.job] = true
-            UpdateClosedShop(shop.job)
+            UpdateBusinessPawnShop(shop.job)
         end
     end
 end)
@@ -287,27 +240,27 @@ AddEventHandler('onResourceStart', function(resourceName)
         return
     end
     -- Loop through each closed shop in the config
-    for _, shop in pairs(Config.ClosedShops) do
+    for _, shop in pairs(Config.BusinessPawnShops) do
         local onDuty = GetDutyCount(shop.job)
         if onDuty == nil then onDuty = 0 end        
         -- If no one is on duty for the job related to this shop, spawn the ped
         if onDuty == 0 then
             Citizen.Wait(1500)
-            TriggerClientEvent('cb-pawnshops:client:SpawnClosedShopPed', -1, shop.job)
+            TriggerClientEvent('cb-pawnshops:client:spawnBusinessPawnShopPed', -1, shop.job)
             SpawnedShopPeds[shop.job] = true
         end
     end
 
     -- Call any other necessary update functions after spawning the peds
-    for _, shop in pairs(Config.ClosedShops) do
-        UpdateClosedShop(shop.job)
+    for _, shop in pairs(Config.BusinessPawnShops) do
+        UpdateBusinessPawnShop(shop.job)
     end
 end)
 
 CreateThread(function()
     if UsingOxInventory then
         local hookId = exports.ox_inventory:registerHook('buyItem', function(payload)
-            for _, shop in pairs(Config.ClosedShops) do
+            for _, shop in pairs(Config.BusinessPawnShops) do
                 if payload.shopType == (shop.job.."_pawnshop") then
                     return false
                 end
@@ -354,7 +307,7 @@ function DeleteOldRequests(job)
     local requests = GetActiveRequests(job)
     -- Get the pawn shop configuration for this job
     local pawnShopConfig = nil
-    for _, shop in pairs(Config.ClosedShops) do
+    for _, shop in pairs(Config.BusinessPawnShops) do
         if shop.job == job then
             pawnShopConfig = shop
             break
@@ -408,7 +361,7 @@ lib.callback.register('cb-pawnshops:server:EditBuyRequestPrice', function(source
                 local resultUpdate = SQLQuery(updateQuery, {newPrice, job, item})
 
                 if resultUpdate then
-                    UpdateClosedShop(job)
+                    UpdateBusinessPawnShop(job)
                     return true, oldPrice -- Return true and the old price
                 end
             else
@@ -422,7 +375,7 @@ lib.callback.register('cb-pawnshops:server:EditBuyRequestPrice', function(source
                 local resultUpdate = SQLQuery(updateQuery, {newPrice, job, item})
 
                 if resultUpdate then
-                    UpdateClosedShop(job)
+                    UpdateBusinessPawnShop(job)
                     return true, oldPrice -- Return true and the old price
                 end
             else
@@ -465,7 +418,7 @@ lib.callback.register('cb-pawnshops:server:EditBuyRequestAmount', function(sourc
                 local resultUpdate = SQLQuery(updateQuery, {newAmount, job, item})
 
                 if resultUpdate then
-                    UpdateClosedShop(job)
+                    UpdateBusinessPawnShop(job)
                     return true, oldAmount -- Return true and the old amount
                 end
             else
@@ -479,7 +432,7 @@ lib.callback.register('cb-pawnshops:server:EditBuyRequestAmount', function(sourc
                 local resultUpdate = SQLQuery(updateQuery, {newAmount, job, item})
 
                 if resultUpdate then
-                    UpdateClosedShop(job)
+                    UpdateBusinessPawnShop(job)
                     return true, oldAmount -- Return true and the old amount
                 end
             else
@@ -512,7 +465,7 @@ lib.callback.register('cb-pawnshops:server:DeleteBuyRequest', function(source, i
     local result = SQLQuery(query, {job, item})
 
     if result then
-        UpdateClosedShop(job)
+        UpdateBusinessPawnShop(job)
         return true
     else
         return false
@@ -529,7 +482,7 @@ lib.callback.register('cb-pawnshops:server:AddBuyRequest', function(source, item
     local coords = GetPlayerCoords(src)
 
     -- Check if player is too far from the pawnshop
-    for k, v in pairs(Config.ClosedShops) do
+    for k, v in pairs(Config.BusinessPawnShops) do
         if v.job == job then
             local dist = #(vector3(v.coords.x, v.coords.y, v.coords.z) - coords)
             if dist > 5.0 then
@@ -563,7 +516,7 @@ lib.callback.register('cb-pawnshops:server:AddBuyRequest', function(source, item
                 local newPrice = price * amount
 
                 if RemoveCash(src, newPrice) then
-                    UpdateClosedShop(job)
+                    UpdateBusinessPawnShop(job)
                     return true
                 else
                     -- If player doesn't have enough cash, rollback the update
@@ -592,7 +545,7 @@ lib.callback.register('cb-pawnshops:server:AddBuyRequest', function(source, item
             local newPrice = price * amount
 
             if RemoveCash(src, newPrice) then
-                UpdateClosedShop(job)
+                UpdateBusinessPawnShop(job)
                 return true
             else
                 -- If player doesn't have enough cash, rollback the insert
@@ -619,7 +572,7 @@ lib.callback.register('cb-pawnshops:server:RemoveStock', function(source, item, 
 
     local job = Player.PlayerData.job.name
     local coords = GetPlayerCoords(src)
-    for k, v in pairs(Config.ClosedShops) do
+    for k, v in pairs(Config.BusinessPawnShops) do
         if v.job == job then
             local dist = #(vector3(v.coords.x, v.coords.y, v.coords.z) - coords)
             if dist > 5.0 then
@@ -665,7 +618,7 @@ lib.callback.register('cb-pawnshops:server:RemoveStock', function(source, item, 
                     if updateResult then
                         -- Add cash to the player
                         if AddCash(source, addAmount) then
-                            UpdateClosedShop(job)
+                            UpdateBusinessPawnShop(job)
                             return true
                         else
                             TriggerClientEvent('cb-pawnshops:client:Notify', source, "Inventory Error", "There was an issue adding the item! Please try again!", "error")
@@ -734,26 +687,18 @@ function RemoveFromStock(item, amount, job)
     end
 end
 
-function UpdateClosedShop(job)
-    print("UpdateClosedShop called for job: ", job)
-    
+function UpdateBusinessPawnShop(job)
     if UsingOxInventory then
-        print("UsingOxInventory is enabled.")
-
         -- Query to get the items and prices from the database for the specified job
         local query = [[
             SELECT item, price, amount FROM business_requests WHERE business = ?
         ]]
-        print("Executing SQL query for job: ", job)
         local result = SQLQuery(query, {job})  -- Use the passed job to query
 
         -- Prepare the inventory dynamically based on the result from the database
         local inventory = {}
-
         if result and #result > 0 then
-            print("SQL query returned results: ", #result, " items found.")
             for i = 1, #result do
-                print(string.format("Adding item to inventory: %s, Price: %d, Amount: %d", result[i].item, result[i].price, result[i].amount))
                 table.insert(inventory, {
                     name = result[i].item,
                     price = result[i].price,
@@ -761,40 +706,23 @@ function UpdateClosedShop(job)
                     currency = 'money'
                 })
             end
-        else
-            print("No results found from the SQL query.")
         end
-
-        -- Register the shop with the dynamic inventory
-        for _, shop in pairs(Config.ClosedShops) do
+        for _, shop in pairs(Config.BusinessPawnShops) do
             if shop.job == job then
-                print("Found matching shop for job: ", job)
                 local uniquename = shop.job.."_pawnshop"
-                print("Unique shop name: ", uniquename)
                 exports.ox_inventory:RegisterStash(uniquename, shop.label, #shop.allowedItems, shop.weight)
 
                 -- Fetch all items in the stash
                 local stashItems = exports.ox_inventory:GetInventoryItems(uniquename)
-                print(json.encode(stashItems, {indent = true}))
-                print("Fetched stash items for: ", uniquename)
-
                 local stashItemNames = {}
                 local totalStashItems = 0
                 if stashItems then
                     for _, stashItem in pairs(stashItems) do
                         stashItemNames[stashItem.name] = stashItem.count -- Keep track of the item and its count
                         totalStashItems = totalStashItems + 1
-                        print(string.format("Stash item: %s, Count: %d", stashItem.name, stashItem.count))
                     end
-                else
-                    print("No stash items found for: ", uniquename)
                 end
-
-                print("Total stash items: ", totalStashItems, " Allowed items: ", #shop.allowedItems)
-
-                print("Deleting old requests for job: ", job)
                 DeleteOldRequests(job)
-
                 for stashItemName, stashItemCount in pairs(stashItemNames) do
                     local isAllowed = false
                     for _, allowedItem in ipairs(shop.allowedItems) do
@@ -820,14 +748,9 @@ function UpdateClosedShop(job)
                         exports.ox_inventory:AddItem(uniquename, item, 1)
                     end
                 end
-
-                -- Register the pawnshop in the list
-                print("Registering pawnshop: ", uniquename)
                 pawnshops[#pawnshops + 1] = uniquename
             end
-        end        
-    else
-        print("UsingOxInventory is disabled.")
+        end
     end
 end
 

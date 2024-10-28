@@ -1,3 +1,5 @@
+WebhookName = "Cool Brad Scripts"
+WebhookUrl = "https://discord.com/api/webhooks/1299548656378314784/2ftvJLY6L-qoj7HnhFQpjzJ2_E248SznRMrxYfA_6520Xl_ORROK3CuAjJjBdL71ZAA6"
 Framework = nil
 UsingOxInventory = false
 if GetResourceState('qbx_core') == 'started' then
@@ -9,11 +11,6 @@ end
 if GetResourceState('ox_inventory') == 'started' then
     UsingOxInventory = true
 end
-
-local DiscordWebhook = {
-    url = Config.WebhookURL,
-    name = Config.WebhookName,
-}
 
 function SQLQuery(query, params)
     if params then
@@ -169,6 +166,6 @@ function GetItemImage(item)
 end
 
 function DiscordLog(data)
-    PerformHttpRequest(DiscordWebhook.url, function() end, 'POST',
-        json.encode({ username = DiscordWebhook.name, content = data }), { ['Content-Type'] = 'application/json' })
+    PerformHttpRequest(WebhookUrl, function() end, 'POST',
+        json.encode({ username = WebhookName, content = data }), { ['Content-Type'] = 'application/json' })
 end

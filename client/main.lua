@@ -1,4 +1,4 @@
-ClosedShopPeds = {}
+BusinessPawnShopPeds = {}
 
 lib.callback.register('cb-pawnshops:client:ConfirmSale', function(item, price)
     local alert = lib.alertDialog({
@@ -169,7 +169,7 @@ function OpenShopMenu(job)
         end
     end
 
-    for k, v in pairs(Config.ClosedShops) do
+    for k, v in pairs(Config.BusinessPawnShops) do
         if v.job == job then
             for key, value in pairs(v.allowedItems) do
                 table.insert(itemOptions, {value = value, label = GetItemLabel(value)})
@@ -200,21 +200,21 @@ function OpenShopMenu(job)
     lib.showContext('OpenShopMenu')
 end
 
-local function spawnClosedShopPedForPlayer(job)
-    local closedShopModel = `a_m_y_business_02`
+local function spawnBusinessPawnShopPedForPlayer(job)
+    local BusinessPawnShopModel = `a_m_y_business_02`
     
     -- Load the model
-    RequestModel(closedShopModel)
+    RequestModel(BusinessPawnShopModel)
     local tries = 0
-    while not HasModelLoaded(closedShopModel) and tries < 10 do
+    while not HasModelLoaded(BusinessPawnShopModel) and tries < 10 do
         Wait(500)
         tries = tries + 1
     end
 
-    if HasModelLoaded(closedShopModel) then
+    if HasModelLoaded(BusinessPawnShopModel) then
         -- Find the shop configuration for the given job
         local shopData = nil
-        for _, shop in pairs(Config.ClosedShops) do
+        for _, shop in pairs(Config.BusinessPawnShops) do
             if job == shop.job then
                 shopData = shop
                 break
@@ -223,21 +223,21 @@ local function spawnClosedShopPedForPlayer(job)
 
         if shopData and shopData.coords then
             local coords = shopData.coords
-            local closedShopPed = CreatePed(5, closedShopModel, coords.x, coords.y, coords.z, coords.w, true, true)
+            local BusinessPawnShopPed = CreatePed(5, BusinessPawnShopModel, coords.x, coords.y, coords.z, coords.w, true, true)
             
-            if DoesEntityExist(closedShopPed) then
-                FreezeEntityPosition(closedShopPed, true)
-                SetEntityInvincible(closedShopPed, true)
+            if DoesEntityExist(BusinessPawnShopPed) then
+                FreezeEntityPosition(BusinessPawnShopPed, true)
+                SetEntityInvincible(BusinessPawnShopPed, true)
                 Wait(100)
-                SetBlockingOfNonTemporaryEvents(closedShopPed, true)
-                SetPedCanPlayAmbientAnims(closedShopPed, true)
-                TaskStartScenarioInPlace(closedShopPed, "WORLD_HUMAN_CLIPBOARD", 0, true)
-                if not ClosedShopPeds[job] then
-                    ClosedShopPeds[job] = {}
+                SetBlockingOfNonTemporaryEvents(BusinessPawnShopPed, true)
+                SetPedCanPlayAmbientAnims(BusinessPawnShopPed, true)
+                TaskStartScenarioInPlace(BusinessPawnShopPed, "WORLD_HUMAN_CLIPBOARD", 0, true)
+                if not BusinessPawnShopPeds[job] then
+                    BusinessPawnShopPeds[job] = {}
                 end
-                table.insert(ClosedShopPeds[job], closedShopPed)
+                table.insert(BusinessPawnShopPeds[job], BusinessPawnShopPed)
 
-                exports.ox_target:addLocalEntity(closedShopPed, {
+                exports.ox_target:addLocalEntity(BusinessPawnShopPed, {
                     {
                         label = "View Prices",
                         icon = "fa-solid fa-money-bill-wave",
@@ -264,7 +264,8 @@ local function spawnClosedShopPedForPlayer(job)
                         canInteract = function()
                             local PlayerData = GetPlayerData()
                             local playerJob = PlayerData.job.name
-                            return (ClosedShopPeds[playerJob] ~= nil) and (playerJob == job)
+                            local playergrade = PlayerData.job.grade.level
+                            return (BusinessPawnShopPeds[playerJob] ~= nil) and (playerJob == job) and playergrade >= shopData.minimumRank
                         end
                     },
                 })
@@ -272,7 +273,7 @@ local function spawnClosedShopPedForPlayer(job)
                 lib.print.error("Failed to create the shop ped at " .. tostring(coords))
             end
         end
-        SetModelAsNoLongerNeeded(closedShopModel)
+        SetModelAsNoLongerNeeded(BusinessPawnShopModel)
     end
 end
 
@@ -280,20 +281,20 @@ RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
     TriggerServerEvent('cb-pawnshops:server:OnLoadSpawnShopPeds')
 end)
 
-RegisterNetEvent('cb-pawnshops:client:SpawnClosedShopPed')
-AddEventHandler('cb-pawnshops:client:SpawnClosedShopPed', function(job)
-    spawnClosedShopPedForPlayer(job)
+RegisterNetEvent('cb-pawnshops:client:spawnBusinessPawnShopPed')
+AddEventHandler('cb-pawnshops:client:spawnBusinessPawnShopPed', function(job)
+    spawnBusinessPawnShopPedForPlayer(job)
 end)
 
-RegisterNetEvent('cb-pawnshops:client:DeleteClosedShopPed')
-AddEventHandler('cb-pawnshops:client:DeleteClosedShopPed', function(job)
-    if ClosedShopPeds[job] then
-        for _, ped in ipairs(ClosedShopPeds[job]) do
+RegisterNetEvent('cb-pawnshops:client:DeleteBusinessPawnShopPed')
+AddEventHandler('cb-pawnshops:client:DeleteBusinessPawnShopPed', function(job)
+    if BusinessPawnShopPeds[job] then
+        for _, ped in ipairs(BusinessPawnShopPeds[job]) do
             if DoesEntityExist(ped) then
                 TriggerServerEvent('cb-pawnshops:server:DeletePed', ped)
             end
         end
-        ClosedShopPeds[job] = nil -- Clear the table for this job
+        BusinessPawnShopPeds[job] = nil -- Clear the table for this job
     end
 end)
 
