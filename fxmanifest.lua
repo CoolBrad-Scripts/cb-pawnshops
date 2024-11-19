@@ -4,7 +4,7 @@ game 'gta5'
 name "cb-pawnshops"
 description "A closed shop system for FiveM RP servers"
 author "Cool Brad Scripts"
-version "1.2.1"
+version "1.2.2"
 
 lua54 'yes'
 use_experimental_fxv2_oal 'yes'
