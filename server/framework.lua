@@ -1,5 +1,5 @@
 WebhookName = "Cool Brad Scripts"
-WebhookUrl = "https://discord.com/api/webhooks/1299548656378314784/2ftvJLY6L-qoj7HnhFQpjzJ2_E248SznRMrxYfA_6520Xl_ORROK3CuAjJjBdL71ZAA6"
+WebhookUrl = "CHANGEME"
 Framework = nil
 UsingOxInventory = false
 lib.versionCheck('CoolBrad-Scripts/cb-pawnshops')
