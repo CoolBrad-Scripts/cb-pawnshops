@@ -228,32 +228,10 @@ AddEventHandler('cb-pawnshops:server:OnLoadSpawnShopPeds', function()
     for _, shop in pairs(Config.BusinessPawnShops) do
         local onDuty = GetDutyCount(shop.job)
         if onDuty <= 0 then
-            TriggerClientEvent('cb-pawnshops:client:spawnBusinessPawnShopPed', -1, shop.job)
+            TriggerClientEvent('cb-pawnshops:client:spawnBusinessPawnShopPed', source, shop.job)
             SpawnedShopPeds[shop.job] = true
             UpdateBusinessPawnShop(shop.job)
         end
-    end
-end)
-
-AddEventHandler('onResourceStart', function(resourceName)
-    if (GetCurrentResourceName() ~= resourceName) then
-        return
-    end
-    -- Loop through each closed shop in the config
-    for _, shop in pairs(Config.BusinessPawnShops) do
-        local onDuty = GetDutyCount(shop.job)
-        if onDuty == nil then onDuty = 0 end        
-        -- If no one is on duty for the job related to this shop, spawn the ped
-        if onDuty == 0 then
-            Citizen.Wait(1500)
-            TriggerClientEvent('cb-pawnshops:client:spawnBusinessPawnShopPed', -1, shop.job)
-            SpawnedShopPeds[shop.job] = true
-        end
-    end
-
-    -- Call any other necessary update functions after spawning the peds
-    for _, shop in pairs(Config.BusinessPawnShops) do
-        UpdateBusinessPawnShop(shop.job)
     end
 end)
 

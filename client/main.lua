@@ -223,8 +223,7 @@ local function spawnBusinessPawnShopPedForPlayer(job)
 
         if shopData and shopData.coords then
             local coords = shopData.coords
-            local BusinessPawnShopPed = CreatePed(5, BusinessPawnShopModel, coords.x, coords.y, coords.z, coords.w, true, true)
-            
+            local BusinessPawnShopPed = CreatePed(5, BusinessPawnShopModel, coords.x, coords.y, coords.z, coords.w, false, true)
             if DoesEntityExist(BusinessPawnShopPed) then
                 FreezeEntityPosition(BusinessPawnShopPed, true)
                 SetEntityInvincible(BusinessPawnShopPed, true)
@@ -236,7 +235,6 @@ local function spawnBusinessPawnShopPedForPlayer(job)
                     BusinessPawnShopPeds[job] = {}
                 end
                 table.insert(BusinessPawnShopPeds[job], BusinessPawnShopPed)
-
                 exports.ox_target:addLocalEntity(BusinessPawnShopPed, {
                     {
                         label = "View Prices",
