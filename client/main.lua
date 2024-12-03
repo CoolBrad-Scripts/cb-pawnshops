@@ -50,6 +50,76 @@ function OpenPricesMenu(job)
     lib.showContext('PricesMenu')
 end
 
+function SellItemMenu(shop, item)
+    local menuOptions = {}
+    table.insert(menuOptions, {
+        title = "Sell All",
+        icon = "fa-solid fa-money-bill-wave",
+        disabled = not HasItemClient(item, 1),
+        onSelect = function()
+            print(shop, item)
+            TriggerServerEvent('cb-pawnshops:server:SellAll', shop, item)
+        end
+    })
+    table.insert(menuOptions, {
+        title = "Sell 1",
+        icon = "fa-solid fa-money-bill-wave",
+        disabled = not HasItemClient(item, 1),
+        onSelect = function()
+            TriggerServerEvent('cb-pawnshops:server:SellOne', shop, item)
+        end
+    })
+    table.insert(menuOptions, {
+        title = "Sell 5",
+        icon = "fa-solid fa-money-bill-wave",
+        disabled = not HasItemClient(item, 5),
+        onSelect = function()
+            TriggerServerEvent('cb-pawnshops:server:SellFive', shop, item)
+        end
+    })
+    table.insert(menuOptions, {
+        title = "Sell 10",
+        icon = "fa-solid fa-money-bill-wave",
+        disabled = not HasItemClient(item, 10),
+        onSelect = function()
+            TriggerServerEvent('cb-pawnshops:server:SellTen', shop, item)
+        end
+    })
+    
+    lib.registerContext({
+        id = 'SellItemPawnShop',
+        title = "Pawn Shop",
+        options = menuOptions
+    })
+    lib.showContext('SellItemPawnShop')
+end
+
+function RegularPawnShopMenu(shop)
+    local menuOptions = {}
+    for k, v in pairs(Config.RegularPawnShops) do
+        if k == shop then
+            for a, b in pairs(v.shopItems) do
+                table.insert(menuOptions, {
+                    title = GetItemLabel(b.item),
+                    description = "Price: $" .. b.price,
+                    icon = GetItemImage(b.item),
+                    onSelect = function()
+                        SellItemMenu(shop, b.item)
+                    end,
+                    disabled = not HasItemClient(b.item, 1)
+                })
+            end
+        end
+    end
+    
+    lib.registerContext({
+        id = 'RegularPawnShop',
+        title = "Pawn Shop",
+        options = menuOptions
+    })
+    lib.showContext('RegularPawnShop')
+end
+
 function EditBuyRequestMenu(job, item)
     local menuOptions = {}
     local buyRequests = lib.callback.await('cb-pawnshops:server:GetBuyRequests', false, job)
@@ -277,6 +347,28 @@ end
 
 RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
     TriggerServerEvent('cb-pawnshops:server:OnLoadSpawnShopPeds')
+end)
+
+RegisterNetEvent('cb-pawnshops:client:SpawnRegularPawnShops', function()
+    for k, v in pairs(Config.RegularPawnShops) do
+        local ped = CreatePed(5, v.model, v.coords.x, v.coords.y, v.coords.z-1, v.coords.w, false, true)
+        FreezeEntityPosition(ped, true)
+        SetEntityInvincible(ped, true)
+        Wait(100)
+        SetBlockingOfNonTemporaryEvents(ped, true)
+        SetPedCanPlayAmbientAnims(ped, true)
+        TaskStartScenarioInPlace(ped, "WORLD_HUMAN_CLIPBOARD", 0, true)
+        exports.ox_target:addLocalEntity(ped, {
+            {
+                label = "Open Pawnshop",
+                icon = "fa-solid fa-money-bill-wave",
+                distance = 2.5,
+                onSelect = function()
+                    RegularPawnShopMenu(k)
+                end,
+            },
+        })
+    end
 end)
 
 RegisterNetEvent('cb-pawnshops:client:spawnBusinessPawnShopPed')

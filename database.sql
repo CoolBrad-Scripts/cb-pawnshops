@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS `business_requests` (
+CREATE TABLE IF NOT EXISTS `cb_pawnshops` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `business` varchar(255) NOT NULL,
   `item` varchar(255) NOT NULL,

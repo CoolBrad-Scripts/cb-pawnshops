@@ -4,7 +4,7 @@ local pawnshops = {}
 function GetActiveRequests(job)
     if not job then return {} end -- Return empty table if job is not provided
     local query = [[
-        SELECT item, price, amount FROM business_requests WHERE business = ?
+        SELECT item, price, amount FROM cb_pawnshops WHERE business = ?
     ]]
     local result = SQLQuery(query, {job}) -- Execute the SQL query with the job as a parameter
 
@@ -27,21 +27,21 @@ end
 function DecreaseRequestAmount(job, item, amount)
     -- First, decrease the amount
     local updateQuery = [[
-        UPDATE business_requests SET amount = amount - ? WHERE business = ? AND item = ?
+        UPDATE cb_pawnshops SET amount = amount - ? WHERE business = ? AND item = ?
     ]]
     local resultUpdate = SQLQuery(updateQuery, {amount, job, item}) -- Execute the SQL query with the job, item, and amount as parameters
 
     if resultUpdate then
         -- Check if the amount has reached 0 or less
         local checkQuery = [[
-            SELECT amount FROM business_requests WHERE business = ? AND item = ?
+            SELECT amount FROM cb_pawnshops WHERE business = ? AND item = ?
         ]]
         local resultCheck = SQLQuery(checkQuery, {job, item})
 
         if resultCheck and resultCheck[1] and resultCheck[1].amount <= 0 then
             -- Delete the request if the amount is 0 or less
             local deleteQuery = [[
-                DELETE FROM business_requests WHERE business = ? AND item = ?
+                DELETE FROM cb_pawnshops WHERE business = ? AND item = ?
             ]]
             SQLQuery(deleteQuery, {job, item}) -- Execute the deletion query
         end
@@ -54,7 +54,7 @@ end
 
 function IncreaseRequestAmount(job, item, amount)
     local query = [[
-        UPDATE business_requests SET amount = amount + ? WHERE business = ? AND item = ?
+        UPDATE cb_pawnshops SET amount = amount + ? WHERE business = ? AND item = ?
     ]]
     local result = SQLQuery(query, {amount, job, item}) -- Execute the SQL query with the job, item, and amount as parameters
 
@@ -233,6 +233,115 @@ AddEventHandler('cb-pawnshops:server:OnLoadSpawnShopPeds', function()
             UpdateBusinessPawnShop(shop.job)
         end
     end
+    TriggerClientEvent('cb-pawnshops:client:SpawnRegularPawnShops', source)
+end)
+
+RegisterNetEvent('cb-pawnshops:server:SellAll')
+AddEventHandler('cb-pawnshops:server:SellAll', function(shop, item)
+    for _, data in pairs(Config.RegularPawnShops) do
+        if _ == shop then
+            local playerCoords = GetPlayerCoords(source)
+            local dist = #(vector3(data.coords.x, data.coords.y, data.coords.z) - playerCoords)
+            if dist > 2.5 then return end
+            for k, v in pairs(data.shopItems) do
+                if v.item == item then
+                    local itemCount = exports.ox_inventory:GetItemCount(source, item)
+                    if not HasItem(source, item, itemCount) then
+                        TriggerClientEvent('cb-pawnshops:client:Notify', source, "Missing Items", "You don't have enough of this item to sell!", "error")
+                        return
+                    end
+                    if RemoveItem(source, item, itemCount) then
+                        if not AddItem(source, "cash", v.price * itemCount) then
+                            print(string.format("There was an error adding %.0f cash to Player %.0f inventory", v.price*itemCount, source))
+                        end
+                    end
+                else
+                    return
+                end
+            end
+        end
+    end
+end)
+
+RegisterNetEvent('cb-pawnshops:server:SellOne')
+AddEventHandler('cb-pawnshops:server:SellOne', function(shop, item)
+    for _, data in pairs(Config.RegularPawnShops) do
+        if _ == shop then
+            local playerCoords = GetPlayerCoords(source)
+            local dist = #(vector3(data.coords.x, data.coords.y, data.coords.z) - playerCoords)
+            if dist > 2.5 then return end
+            for k, v in pairs(data.shopItems) do
+                if v.item == item then
+                    local itemCount = 1
+                    if not HasItem(source, item, itemCount) then
+                        TriggerClientEvent('cb-pawnshops:client:Notify', source, "Missing Items", "You don't have enough of this item to sell!", "error")
+                        return
+                    end
+                    if RemoveItem(source, item, itemCount) then
+                        if not AddItem(source, "cash", v.price * itemCount) then
+                            print(string.format("There was an error adding %.0f cash to Player %.0f inventory", v.price*itemCount, source))
+                        end
+                    end
+                else
+                    return
+                end
+            end
+        end
+    end
+end)
+
+RegisterNetEvent('cb-pawnshops:server:SellFive')
+AddEventHandler('cb-pawnshops:server:SellFive', function(shop, item)
+    for _, data in pairs(Config.RegularPawnShops) do
+        if _ == shop then
+            local playerCoords = GetPlayerCoords(source)
+            local dist = #(vector3(data.coords.x, data.coords.y, data.coords.z) - playerCoords)
+            if dist > 2.5 then return end
+            for k, v in pairs(data.shopItems) do
+                if v.item == item then
+                    local itemCount = 5
+                    if not HasItem(source, item, itemCount) then
+                        TriggerClientEvent('cb-pawnshops:client:Notify', source, "Missing Items", "You don't have enough of this item to sell!", "error")
+                        return
+                    end
+                    if RemoveItem(source, item, itemCount) then
+                        if not AddItem(source, "cash", v.price * itemCount) then
+                            print(string.format("There was an error adding %.0f cash to Player %.0f inventory", v.price*itemCount, source))
+                        end
+                    end
+                else
+                    return
+                end
+            end
+        end
+    end
+end)
+
+RegisterNetEvent('cb-pawnshops:server:SellTen')
+AddEventHandler('cb-pawnshops:server:SellTen', function(shop, item)
+    for _, data in pairs(Config.RegularPawnShops) do
+        if _ == shop then
+            local playerCoords = GetPlayerCoords(source)
+            local dist = #(vector3(data.coords.x, data.coords.y, data.coords.z) - playerCoords)
+            if dist > 2.5 then return end
+            for k, v in pairs(data.shopItems) do
+                if v.item == item then
+                    local itemCount = 10
+                    if not HasItem(source, item, itemCount) then
+                        TriggerClientEvent('cb-pawnshops:client:Notify', source, "Missing Items", "You don't have enough of this item to sell!", "error")
+                        return
+                    end
+                    if RemoveItem(source, item, itemCount) then
+                        if not AddItem(source, "cash", v.price * itemCount) then
+                            print(string.format("There was an error adding %.0f cash to Player %.0f inventory", v.price*itemCount, source))
+                        end
+                    end
+                else
+                    return
+                end
+            end
+        end
+    end
 end)
 
 CreateThread(function()
@@ -259,7 +368,7 @@ lib.callback.register('cb-pawnshops:server:GetBuyRequests', function(source, job
     if Player == nil then return end
 
     local query = [[
-        SELECT item, price, amount FROM business_requests WHERE business = ?
+        SELECT item, price, amount FROM cb_pawnshops WHERE business = ?
     ]]
     local result = SQLQuery(query, {job})
     if result and #result > 0 then
@@ -305,7 +414,7 @@ function DeleteOldRequests(job)
     for _, request in pairs(requests) do
         if not allowedItemsSet[request.item] then
             local deleteQuery = [[
-                DELETE FROM business_requests WHERE business = ? AND item = ?
+                DELETE FROM cb_pawnshops WHERE business = ? AND item = ?
             ]]
             SQLQuery(deleteQuery, {job, request.item})
             DiscordLog(string.format("Removed an unauthorized request for %s from %s resulting in $%.0f being lost by the business", request.item, job, request.price * request.amount))
@@ -325,7 +434,7 @@ lib.callback.register('cb-pawnshops:server:EditBuyRequestPrice', function(source
 
     -- Fetch the old price first
     local fetchQuery = [[
-        SELECT price, amount FROM business_requests WHERE business = ? AND item = ?
+        SELECT price, amount FROM cb_pawnshops WHERE business = ? AND item = ?
     ]]
     local resultOld = SQLQuery(fetchQuery, {job, item})
     
@@ -334,7 +443,7 @@ lib.callback.register('cb-pawnshops:server:EditBuyRequestPrice', function(source
         if oldPrice > newPrice then
             if AddCash(src, (oldPrice - newPrice) * resultOld[1].amount) then
                 local updateQuery = [[
-                    UPDATE business_requests SET price = ? WHERE business = ? AND item = ?
+                    UPDATE cb_pawnshops SET price = ? WHERE business = ? AND item = ?
                 ]]
                 local resultUpdate = SQLQuery(updateQuery, {newPrice, job, item})
 
@@ -348,7 +457,7 @@ lib.callback.register('cb-pawnshops:server:EditBuyRequestPrice', function(source
         elseif newPrice > oldPrice then
             if RemoveCash(src, (newPrice - oldPrice) * resultOld[1].amount) then
                 local updateQuery = [[
-                    UPDATE business_requests SET price = ? WHERE business = ? AND item = ?
+                    UPDATE cb_pawnshops SET price = ? WHERE business = ? AND item = ?
                 ]]
                 local resultUpdate = SQLQuery(updateQuery, {newPrice, job, item})
 
@@ -382,7 +491,7 @@ lib.callback.register('cb-pawnshops:server:EditBuyRequestAmount', function(sourc
 
     -- Fetch the old amount first
     local fetchQuery = [[
-        SELECT amount, price FROM business_requests WHERE business = ? AND item = ?
+        SELECT amount, price FROM cb_pawnshops WHERE business = ? AND item = ?
     ]]
     local resultOld = SQLQuery(fetchQuery, {job, item})
     
@@ -391,7 +500,7 @@ lib.callback.register('cb-pawnshops:server:EditBuyRequestAmount', function(sourc
         if oldAmount > newAmount then
             if AddCash(src, resultOld[1].price * (oldAmount - newAmount)) then
                 local updateQuery = [[
-                    UPDATE business_requests SET amount = ? WHERE business = ? AND item = ?
+                    UPDATE cb_pawnshops SET amount = ? WHERE business = ? AND item = ?
                 ]]
                 local resultUpdate = SQLQuery(updateQuery, {newAmount, job, item})
 
@@ -405,7 +514,7 @@ lib.callback.register('cb-pawnshops:server:EditBuyRequestAmount', function(sourc
         elseif newAmount > oldAmount then
             if RemoveCash(src, resultOld[1].price * (newAmount - oldAmount)) then
                 local updateQuery = [[
-                    UPDATE business_requests SET amount = ? WHERE business = ? AND item = ?
+                    UPDATE cb_pawnshops SET amount = ? WHERE business = ? AND item = ?
                 ]]
                 local resultUpdate = SQLQuery(updateQuery, {newAmount, job, item})
 
@@ -438,7 +547,7 @@ lib.callback.register('cb-pawnshops:server:DeleteBuyRequest', function(source, i
     end
 
     local query = [[
-        DELETE FROM business_requests WHERE business = ? AND item = ?
+        DELETE FROM cb_pawnshops WHERE business = ? AND item = ?
     ]]
     local result = SQLQuery(query, {job, item})
 
@@ -472,7 +581,7 @@ lib.callback.register('cb-pawnshops:server:AddBuyRequest', function(source, item
 
     -- Check if the item already exists for the given business in the database
     local checkQuery = [[
-        SELECT amount FROM business_requests WHERE business = ? AND item = ?
+        SELECT amount FROM cb_pawnshops WHERE business = ? AND item = ?
     ]]
     local result = SQLQuery(checkQuery, {job, item})
 
@@ -485,7 +594,7 @@ lib.callback.register('cb-pawnshops:server:AddBuyRequest', function(source, item
         else
             -- If the item exists and amount is zero, update the row with the new data
             local updateQuery = [[
-                UPDATE business_requests SET amount = ?, price = ?, updated_at = CURRENT_TIMESTAMP WHERE business = ? AND item = ?
+                UPDATE cb_pawnshops SET amount = ?, price = ?, updated_at = CURRENT_TIMESTAMP WHERE business = ? AND item = ?
             ]]
             local updateResult = SQLQuery(updateQuery, {amount, price, job, item})
 
@@ -499,7 +608,7 @@ lib.callback.register('cb-pawnshops:server:AddBuyRequest', function(source, item
                 else
                     -- If player doesn't have enough cash, rollback the update
                     local rollbackQuery = [[
-                        UPDATE business_requests SET amount = 0 WHERE business = ? AND item = ?
+                        UPDATE cb_pawnshops SET amount = 0 WHERE business = ? AND item = ?
                     ]]
                     SQLQuery(rollbackQuery, {job, item})
                     TriggerClientEvent('cb-pawnshops:client:Notify', src, "Insufficient Funds", "You don't have enough cash to complete the request!", "error")
@@ -513,7 +622,7 @@ lib.callback.register('cb-pawnshops:server:AddBuyRequest', function(source, item
     else
         -- If the item does not exist, insert a new row
         local insertQuery = [[
-            INSERT INTO business_requests (business, item, amount, price, updated_at)
+            INSERT INTO cb_pawnshops (business, item, amount, price, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         ]]
         local insertResult = SQLQuery(insertQuery, {job, item, amount, price})
@@ -528,7 +637,7 @@ lib.callback.register('cb-pawnshops:server:AddBuyRequest', function(source, item
             else
                 -- If player doesn't have enough cash, rollback the insert
                 local deleteQuery = [[
-                    DELETE FROM business_requests WHERE business = ? AND item = ?
+                    DELETE FROM cb_pawnshops WHERE business = ? AND item = ?
                 ]]
                 SQLQuery(deleteQuery, {job, item})
                 TriggerClientEvent('cb-pawnshops:client:Notify', src, "Insufficient Funds", "You don't have enough cash to complete the request!", "error")
@@ -564,7 +673,7 @@ lib.callback.register('cb-pawnshops:server:RemoveStock', function(source, item, 
     if UsingOxInventory then
         -- Query to get the current amount of the item in stock for the player's job/business
         local query = [[
-            SELECT amount FROM business_requests WHERE business = ? AND item = ?
+            SELECT amount FROM cb_pawnshops WHERE business = ? AND item = ?
         ]]
         local result = SQLQuery(query, {job, item})
 
@@ -575,7 +684,7 @@ lib.callback.register('cb-pawnshops:server:RemoveStock', function(source, item, 
             if currentAmount >= amount then
                 -- Retrieve the price of the item
                 local priceQuery = [[
-                    SELECT price FROM business_requests WHERE business = ? AND item = ?
+                    SELECT price FROM cb_pawnshops WHERE business = ? AND item = ?
                 ]]
                 local priceResult = SQLQuery(priceQuery, {job, item})
         
@@ -588,7 +697,7 @@ lib.callback.register('cb-pawnshops:server:RemoveStock', function(source, item, 
         
                     -- Update the stock, reducing the item count
                     local updateQuery = [[
-                        UPDATE business_requests SET amount = amount - ? WHERE business = ? AND item = ?
+                        UPDATE cb_pawnshops SET amount = amount - ? WHERE business = ? AND item = ?
                     ]]
                     local updateResult = SQLQuery(updateQuery, {amount, job, item})
         
@@ -629,7 +738,7 @@ function RemoveFromStock(item, amount, job)
     if UsingOxInventory then
         -- Query to get the current amount of the item in stock
         local query = [[
-            SELECT amount FROM business_requests WHERE business = ? AND item = ?
+            SELECT amount FROM cb_pawnshops WHERE business = ? AND item = ?
         ]]
         local result = SQLQuery(query, {job, item})
 
@@ -640,7 +749,7 @@ function RemoveFromStock(item, amount, job)
             if currentAmount >= amount then
                 -- Update the stock, reducing the item count
                 local updateQuery = [[
-                    UPDATE business_requests SET amount = amount - ? WHERE business = ? AND item = ?
+                    UPDATE cb_pawnshops SET amount = amount - ? WHERE business = ? AND item = ?
                 ]]
                 local updateResult = SQLQuery(updateQuery, {amount, job, item})
 
@@ -669,7 +778,7 @@ function UpdateBusinessPawnShop(job)
     if UsingOxInventory then
         -- Query to get the items and prices from the database for the specified job
         local query = [[
-            SELECT item, price, amount FROM business_requests WHERE business = ?
+            SELECT item, price, amount FROM cb_pawnshops WHERE business = ?
         ]]
         local result = SQLQuery(query, {job})  -- Use the passed job to query
 

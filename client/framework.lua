@@ -20,6 +20,18 @@ function GetPlayerData()
     end
 end
 
+function HasItemClient(item, amount)
+    if amount == nil then amount = 1 end
+    local itemCount = exports.ox_inventory:GetItemCount(item)
+    if not itemCount then
+        return false
+    elseif itemCount >= amount then
+        return true
+    else
+        return false
+    end
+end
+
 function Notify(label, message, type)
     lib.notify({
         title = label,
