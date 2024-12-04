@@ -344,6 +344,34 @@ AddEventHandler('cb-pawnshops:server:SellTen', function(shop, item)
     end
 end)
 
+RegisterNetEvent('cb-pawnshops:server:SellEverything')
+AddEventHandler('cb-pawnshops:server:SellEverything', function(shop)
+    for _, data in pairs(Config.RegularPawnShops) do
+        if _ == shop then
+            local playerCoords = GetPlayerCoords(source)
+            local dist = #(vector3(data.coords.x, data.coords.y, data.coords.z) - playerCoords)
+            if dist > 2.5 then return end
+            local soldItem = false
+            for k, v in pairs(data.shopItems) do
+                local item = v.item
+                local itemCount = exports.ox_inventory:GetItemCount(source, item)
+                if itemCount ~= 0 and itemCount ~= nil then
+                    if RemoveItem(source, item, itemCount) then
+                        if not AddItem(source, "cash", v.price * itemCount) then
+                            print(string.format("There was an error adding %.0f cash to Player %.0f inventory", v.price*itemCount, source))
+                        else
+                            soldItem = true
+                        end
+                    end
+                end
+            end
+            if not soldItem then
+                TriggerClientEvent('cb-pawnshops:client:Notify', source, "Nothing to Sell", "You don't have anything to sell to this shop!", "error")
+            end
+        end
+    end
+end)
+
 CreateThread(function()
     if UsingOxInventory then
         local hookId = exports.ox_inventory:registerHook('buyItem', function(payload)

@@ -27,14 +27,11 @@ Config.RegularPawnShops = {
         coords = vec4(182.04, -1319.89, 29.31, 253.88),
         model = "a_m_y_business_02",
         shopItems = {
-            {item = "testburger", price = 10}
-        }
-    },
-    {
-        coords = vec4(183.06, -1323.37, 29.32, 338.9),
-        model = "a_m_y_business_02",
-        shopItems = {
-            {item = "iron", price = 10}
+            {item = "iron", price = 10},
+            {item = "aluminum", price = 10},
+            {item = "testburger", price = 10},
+            {item = "steel", price = 10},
+            {item = "sandwich", price = 10}
         }
     },
 }

@@ -96,6 +96,13 @@ end
 
 function RegularPawnShopMenu(shop)
     local menuOptions = {}
+    table.insert(menuOptions, {
+        title = "Sell All",
+        description = "Sell everything you have in your pockets to the Pawn Shop",
+        onSelect = function()
+            TriggerServerEvent('cb-pawnshops:server:SellEverything', shop)
+        end,
+    })
     for k, v in pairs(Config.RegularPawnShops) do
         if k == shop then
             for a, b in pairs(v.shopItems) do
