@@ -352,11 +352,7 @@ local function spawnBusinessPawnShopPedForPlayer(job)
     end
 end
 
-RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
-    TriggerServerEvent('cb-pawnshops:server:OnLoadSpawnShopPeds')
-end)
-
-RegisterNetEvent('cb-pawnshops:client:SpawnRegularPawnShops', function()
+function SpawnRegularPawnShops()
     for k, v in pairs(Config.RegularPawnShops) do
         local ped = CreatePed(5, v.model, v.coords.x, v.coords.y, v.coords.z-1, v.coords.w, false, true)
         FreezeEntityPosition(ped, true)
@@ -376,6 +372,11 @@ RegisterNetEvent('cb-pawnshops:client:SpawnRegularPawnShops', function()
             },
         })
     end
+end
+
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
+    TriggerServerEvent('cb-pawnshops:server:OnLoadSpawnShopPeds')
+    SpawnRegularPawnShops()
 end)
 
 RegisterNetEvent('cb-pawnshops:client:spawnBusinessPawnShopPed')

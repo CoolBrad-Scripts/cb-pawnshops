@@ -233,7 +233,6 @@ AddEventHandler('cb-pawnshops:server:OnLoadSpawnShopPeds', function()
             UpdateBusinessPawnShop(shop.job)
         end
     end
-    TriggerClientEvent('cb-pawnshops:client:SpawnRegularPawnShops', source)
 end)
 
 RegisterNetEvent('cb-pawnshops:server:SellAll')
